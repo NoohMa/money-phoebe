@@ -270,7 +270,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.11';
+const VERSION = 'v2.12';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -457,6 +457,12 @@ function instPieces(t){
   const pa = Math.floor(t.amount / n * f) / f, pf = Math.floor(fee / n * f) / f;
   for (let k = 0; k < n; k++) out.push({date:addM(t.date, k), k, amt:k === n - 1 ? t.amount - pa * (n - 1) : pa, fee:k === n - 1 ? fee - pf * (n - 1) : pf});
   return out;
+}
+/* 分期進度：以信用卡最近結帳日為準（沒設結帳日就用今天） */
+function instStatus(t){
+  const a = S.data.accounts[t.accountId], ci = a ? cardInfo(a) : null, cut = ci ? ci.close : today();
+  const ps = instPieces(t), billed = ps.filter(p => p.date <= cut).length, rest = ps.slice(billed);
+  return {billed, left:rest.length, per:(ps[0].amt + ps[0].fee), remain:rest.reduce((x, p) => x + p.amt + p.fee, 0), last:ps[ps.length - 1].date};
 }
 function delta(t, aid){
   let d = 0;
@@ -655,7 +661,7 @@ function txnRow(t, forAcct, withDate, noDate){
   }
   if (t.note) sub.unshift(t.note);
   if (t.projectId && S.data.projects[t.projectId]) sub.push('#' + S.data.projects[t.projectId].name);
-  if (t.inst && t.inst.n > 1) sub.push(`分期 ${t.inst.n} 期`);
+  if (t.inst && t.inst.n > 1) { const st = instStatus(t); sub.push(st.left ? `分期 ${t.inst.n} 期・剩 ${st.left} 期` : `分期 ${t.inst.n} 期・已繳完`); }
   if (t.rule) sub.push('固定');
   if ((forAcct && !noDate) || withDate) sub.unshift(withDate ? t.date.replace(/-/g, '/') : md(t.date));
   return `<button class="row" onclick="openAdd('${t.id}')"><span class="cic" style="background:${color}">${ic(icon,20)}</span>
@@ -806,6 +812,18 @@ function viewAcct(){
       <div style="font-size:30px;font-weight:800;margin-top:4px" class="${b < 0 ? 'exp' : ''}">${fmt(b, a.currency)}</div>
       ${a.currency !== 'TWD' ? `<small class="tx2">≈ ${twd(b * rate(a.currency))}</small>` : ''}</div>
     ${info}
+    ${(() => { if (a.type !== 'credit') return '';
+      const ins = c.list.filter(t => t.type === 'expense' && t.accountId === a.id && t.inst && t.inst.n > 1).map(t => ({t, st:instStatus(t)})).filter(x => x.st.left > 0)
+        .sort((x, y) => x.st.left - y.st.left || y.st.remain - x.st.remain);
+      if (!ins.length) return '';
+      const open = S.ui.instOpen === a.id, SHOW = 3, shown = open ? ins : ins.slice(0, SHOW);
+      const monthly = ins.reduce((x, i) => x + i.st.per, 0);
+      return `<div class="sec"><h3>分期中 <span class="sm tx2" style="font-weight:400">${ins.length} 筆</span></h3><span class="sm tx2">每月約 ${fmt(monthly, a.currency)} · 未入帳 ${fmt(ins.reduce((x, i) => x + i.st.remain, 0), a.currency)}</span></div>
+      <div class="list">${shown.map(({t, st}) => { const c0 = S.data.categories[t.catId], m = catMain(c0);
+        return `<button class="row" onclick="openAdd('${t.id}')"><span class="cic" style="background:${m ? m.color : '#aaa'}">${ic(m ? m.icon : 'more',20)}</span>
+          <span class="mid"><b>${esc(c0 ? c0.name : '分期')}</b>${t.note ? `<small>${esc(t.note.split('\n')[0])}</small>` : ''}<small>已繳 ${st.billed}/${t.inst.n} 期・<b style="display:inline;color:var(--pri)">剩 ${st.left} 期</b>・每期 ${fmt(st.per, a.currency)}</small></span>
+          <span class="amt">${fmt(st.remain, a.currency)}<small>到 ${st.last.slice(0, 7).replace('-', '/')}</small></span></button>`; }).join('')}
+        ${ins.length > SHOW ? `<button class="row" style="justify-content:center;color:var(--acc);font-weight:600" onclick="S.ui.instOpen=${open ? 'null' : `'${a.id}'`};render()">${open ? '收合' : `顯示全部 ${ins.length} 筆`}</button>` : ''}</div>`; })()}
     <div class="rbar" style="margin-top:14px"><h3 style="margin:0 4px;font-size:15px">明細</h3><div class="nav2"><button onclick="amShift(-1)">${ic('left',20)}</button><span>${ay} 年 ${amn + 1} 月</span><button onclick="amShift(1)">${ic('right',20)}</button></div></div>
     <div class="card" style="padding:12px 16px"><div class="sum3">
       <div><small>流入</small><b class="inc" style="font-size:16px">${fmt(mIn, a.currency)}</b></div>
