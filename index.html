@@ -270,7 +270,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.12';
+const VERSION = 'v2.14';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -382,7 +382,7 @@ const DEF_CATS = {
   ]
 };
 const FEE_CAT = 'c_e10_0';
-const COLS = ['accounts','txns','categories','projects','recurring','templates'];
+const COLS = ['accounts','txns','categories','projects','recurring','templates','plans'];
 function defaultData(){
   const categories = {};
   for (const type of ['expense','income']) {
@@ -395,14 +395,14 @@ function defaultData(){
   const cashId = 'a_cash';
   return {
     accounts:{[cashId]:{id:cashId, name:'現金', type:'cash', currency:'TWD', init:0, order:0, color:'#4F6D7A', archived:false}},
-    txns:{}, categories, projects:{}, recurring:{}, templates:{}
+    txns:{}, categories, projects:{}, recurring:{}, templates:{}, plans:{}
   };
 }
 
 /* ---------- state ---------- */
 const S = {
   mode:'local', user:null, ledgerId:null, ready:false,
-  data:{accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}},
+  data:{accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}},
   settings:{theme:'rose', custom:{pri:'#C0707C', acc:'#2A8378'}, carrier:'', rateOverride:{}},
   ui:{tab:'home', sel:today(), acct:null, sorting:false, showArch:false, rp:{seg:'cat', per:'month', type:'expense', y:new Date().getFullYear(), m:new Date().getMonth()}}
 };
@@ -424,11 +424,12 @@ function readLocal(){ try { return JSON.parse(localStorage.getItem(LOCAL_KEY)); 
 function saveLocal(){ if (S.mode !== 'local') return; try { localStorage.setItem(LOCAL_KEY, JSON.stringify({data:S.data, settings:S.settings})); } catch(e){ toast('儲存空間不足'); } }
 /* 雲端還在連線時先記下來，連上後自動補送 */
 const PENDING = [];
+const clean = o => JSON.parse(JSON.stringify(o));   // Firestore 不接受 undefined
 function cloudWrite(fn){ if (ledgerRef) fn(ledgerRef); else PENDING.push(fn); }
 function put(col, obj, silent){
   obj.updatedAt = Date.now();
   S.data[col][obj.id] = obj; bump();
-  if (S.mode === 'cloud') cloudWrite(L => L.collection(col).doc(obj.id).set(obj).catch(e => toast('同步失敗：' + e.code)));
+  if (S.mode === 'cloud') cloudWrite(L => L.collection(col).doc(obj.id).set(clean(obj)).catch(e => toast('同步失敗：' + e.code)));
   else saveLocal();
   if (!silent) render();
 }
@@ -441,7 +442,7 @@ function del(col, id){
 function putSettings(patch){
   S.settings = {...S.settings, ...patch};
   if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
-  if (S.mode === 'cloud') { const st = S.settings; cloudWrite(L => L.collection('meta').doc('settings').set(st, {merge:true})); bump(); }
+  if (S.mode === 'cloud') { const st = S.settings; cloudWrite(L => L.collection('meta').doc('settings').set(clean(st))); bump(); }
   else saveLocal();
   applyTheme(); render();
 }
@@ -458,6 +459,17 @@ function instPieces(t){
   for (let k = 0; k < n; k++) out.push({date:addM(t.date, k), k, amt:k === n - 1 ? t.amount - pa * (n - 1) : pa, fee:k === n - 1 ? fee - pf * (n - 1) : pf});
   return out;
 }
+/* 帳單分期／舊分期（plans）：pieces 依信用卡結帳日入帳 */
+function planPieces(pl){
+  const a = S.data.accounts[pl.accountId], n = Math.max(1, +pl.n || 1), tot = (+pl.principal || 0) + (+pl.fee || 0);
+  const [fy, fm] = (pl.firstMonth || today().slice(0, 7)).split('-').map(Number), cd = a && a.closeDay ? a.closeDay : 1;
+  const per = Math.floor(tot / n), fper = Math.floor((+pl.fee || 0) / n), out = [];
+  for (let k = 0; k < n; k++) { const y = fy + Math.floor((fm - 1 + k) / 12), m = (fm - 1 + k) % 12;
+    out.push({date:ds(new Date(y, m, Math.min(cd, dim(y, m)))), k, amt:k === n - 1 ? tot - per * (n - 1) : per, fee:k === n - 1 ? (+pl.fee || 0) - fper * (n - 1) : fper}); }
+  return out;
+}
+function planFeeUpTo(aid, upto){ let s = 0; for (const pl of Object.values(S.data.plans || {})) if (pl.accountId === aid && pl.kind !== 'legacy' && +pl.fee > 0 && planOffsetDate(pl) <= upto) s += +pl.fee; return s; }
+const planOffsetDate = pl => pl.kind === 'legacy' ? '1900-01-01' : (() => { const p = planPieces(pl)[0]; return addM(p.date, -1); })();
 /* 分期進度：以信用卡最近結帳日為準（沒設結帳日就用今天） */
 function instStatus(t){
   const a = S.data.accounts[t.accountId], ci = a ? cardInfo(a) : null, cut = ci ? ci.close : today();
@@ -507,6 +519,11 @@ function compute(){
       }
     }
   }
+  for (const pl of Object.values(S.data.plans || {})) {
+    const a = A[pl.accountId]; if (!a || !(+pl.fee > 0) || pl.kind === 'legacy') continue;
+    bal[a.id] -= +pl.fee;
+    for (const p of planPieces(pl)) if (p.fee) flows.push({t:{id:'plan_' + pl.id, type:'expense', date:p.date, amount:p.fee, catId:FEE_CAT, note:(pl.name || '帳單分期') + ' 手續費', accountId:a.id, plan:pl.id, createdAt:0}, date:p.date, type:'expense', cat:FEE_CAT, amt:p.fee * (a.currency === 'TWD' ? 1 : avg[a.id]), proj:null});
+  }
   flows.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
   CC = {ver:VER, bal, avg, tw, days, list, flows};
   return CC;
@@ -530,8 +547,14 @@ function netWorth(){
   }
   return {as, li, net:as - li};
 }
+let CI_MEMO = {ver:-1, m:{}};
 function cardInfo(a){
   if (a.type !== 'credit' || !a.closeDay || !a.dueDay) return null;
+  if (CI_MEMO.ver !== VER) CI_MEMO = {ver:VER, m:{}};
+  if (CI_MEMO.m[a.id]) return CI_MEMO.m[a.id];
+  return (CI_MEMO.m[a.id] = cardInfoRaw(a));
+}
+function cardInfoRaw(a){
   const t = new Date(), td = today();
   let y = t.getFullYear(), m = t.getMonth();
   let cd = Math.min(a.closeDay, dim(y, m));
@@ -549,9 +572,16 @@ function cardInfo(a){
     const d = delta(x, a.id); if (!d) continue;
     if (x.date <= close) stmt += d; else if (d > 0) paid += d;
   }
-  const owed = Math.max(0, -stmt), remain = Math.max(0, owed - paid);
+  for (const pl of Object.values(S.data.plans || {})) {
+    if (pl.accountId !== a.id) continue;
+    if (planOffsetDate(pl) <= close) stmt += +pl.principal || 0;
+    for (const p of planPieces(pl)) { if (p.date <= close) stmt -= p.amt; else unbilled += p.amt; }
+  }
+  let owed = Math.max(0, -stmt), manual = false;
+  if (a.stmtOverride && a.stmtOverride.close === close) { owed = +a.stmtOverride.amount || 0; manual = true; }
+  const remain = Math.max(0, owed - paid);
   const bal = c.bal[a.id] || 0;
-  return {close, due, owed, paid, remain, unbilled, left:diffD(due, td), over:bal > 0 ? bal : 0, avail:a.limit ? a.limit + Math.min(0, bal) + Math.max(0, bal) : null};
+  return {close, due, owed, paid, remain, unbilled, manual, auto:Math.max(0, -stmt), left:diffD(due, td), over:bal > 0 ? bal : 0, avail:a.limit ? a.limit + Math.min(0, bal) + Math.max(0, bal) : null};
 }
 
 /* ---------- theme ---------- */
@@ -664,7 +694,7 @@ function txnRow(t, forAcct, withDate, noDate){
   if (t.inst && t.inst.n > 1) { const st = instStatus(t); sub.push(st.left ? `分期 ${t.inst.n} 期・剩 ${st.left} 期` : `分期 ${t.inst.n} 期・已繳完`); }
   if (t.rule) sub.push('固定');
   if ((forAcct && !noDate) || withDate) sub.unshift(withDate ? t.date.replace(/-/g, '/') : md(t.date));
-  return `<button class="row" onclick="openAdd('${t.id}')"><span class="cic" style="background:${color}">${ic(icon,20)}</span>
+  return `<button class="row" onclick="${t.plan ? `openPlan('${t.plan}')` : `openAdd('${t.id}')`}"><span class="cic" style="background:${color}">${ic(icon,20)}</span>
     <span class="mid"><b>${esc(title)}</b>${sub.length ? `<small>${esc(sub.join(' · '))}</small>` : ''}</span>
     <span class="amt ${cls}">${amt}${small ? `<small>${small}</small>` : ''}</span></button>`;
 }
@@ -786,20 +816,22 @@ function viewAcct(){
   const c = compute(), b = c.bal[a.id] || 0, ci = cardInfo(a);
   if (!S.ui.am) { const n = new Date(); S.ui.am = {y:n.getFullYear(), m:n.getMonth()}; }
   const {y:ay, m:amn} = S.ui.am, mf = ds(new Date(ay, amn, 1)), mt = ds(new Date(ay, amn, dim(ay, amn)));
-  const list = c.list.filter(t => (t.accountId === a.id || t.toAccountId === a.id) && t.date >= mf && t.date <= mt).reverse();
-  let mIn = 0, mOut = 0, endBal = +a.init || 0;
+  const list = c.list.filter(t => (t.accountId === a.id || (t.type === 'transfer' && t.toAccountId === a.id)) && t.date >= mf && t.date <= mt).reverse();
+  let mIn = 0, mOut = 0, endBal = (+a.init || 0) - planFeeUpTo(a.id, mt);
   for (const t of c.list) { if (t.date > mt) break; const d = delta(t, a.id); endBal += d; if (t.date >= mf && d) { if (d > 0) mIn += d; else mOut -= d; } }
   const now = new Date(), isCurM = ay === now.getFullYear() && amn === now.getMonth();
   let info = '';
   if (ci) info = `<div class="card"><div class="kv">
-      <div><small>本期應繳（${md(ci.close)} 結帳）</small><b>${fmt(ci.owed, a.currency)}</b></div>
+      <div><small>本期應繳（${md(ci.close)} 結帳）</small><b>${fmt(ci.owed, a.currency)}</b>${ci.manual ? `<small class="tx2">依帳單・App 推算 ${fmt(ci.auto, a.currency)}</small>` : ''}</div>
       <div><small>已繳</small><b class="inc">${fmt(ci.paid, a.currency)}</b></div>
       <div><small>剩餘未繳</small><b class="${ci.remain ? 'exp' : ''}">${fmt(ci.remain, a.currency)}</b></div>
       <div><small>繳款截止</small><b>${md(ci.due)}（${ci.left >= 0 ? ci.left + ' 天' : '逾期'}）</b></div>
       ${a.limit ? `<div><small>額度</small><b>${fmt(a.limit, a.currency)}</b></div><div><small>可用額度</small><b>${fmt(Math.max(0, a.limit + Math.min(0, b)), a.currency)}</b></div>` : ''}
       ${ci.unbilled ? `<div><small>分期未入帳</small><b>${fmt(ci.unbilled, a.currency)}</b></div>` : ''}
       ${ci.over ? `<div><small>溢繳</small><b class="inc">${fmt(ci.over, a.currency)}</b></div>` : ''}
-    </div><div class="hint" style="margin:10px 0 0">繳卡費：記一筆「轉帳」，從銀行帳戶轉入這張卡</div></div>`;
+    </div>
+    <div class="two" style="margin-top:12px"><button class="btn sec2" style="padding:10px" onclick="setStmt('${a.id}')">${ci.manual ? '修改帳單金額' : '以帳單為準'}</button><button class="btn sec2" style="padding:10px" onclick="openPlan(null,'${a.id}')">＋ 帳單分期</button></div>
+    <div class="hint" style="margin:10px 0 0">繳卡費：記一筆「轉帳」，從銀行帳戶轉入這張卡</div></div>`;
   else if (a.currency !== 'TWD') {
     const cr = rate(a.currency), av = c.avg[a.id], gain = b * (cr - av);
     info = `<div class="card"><div class="kv">
@@ -813,13 +845,17 @@ function viewAcct(){
       ${a.currency !== 'TWD' ? `<small class="tx2">≈ ${twd(b * rate(a.currency))}</small>` : ''}</div>
     ${info}
     ${(() => { if (a.type !== 'credit') return '';
-      const ins = c.list.filter(t => t.type === 'expense' && t.accountId === a.id && t.inst && t.inst.n > 1).map(t => ({t, st:instStatus(t)})).filter(x => x.st.left > 0)
+      const ins = [...c.list.filter(t => t.type === 'expense' && t.accountId === a.id && t.inst && t.inst.n > 1).map(t => ({t, st:instStatus(t)})),
+        ...Object.values(S.data.plans || {}).filter(pl => pl.accountId === a.id).map(pl => ({pl, st:planStatus(pl, ci)}))].filter(x => x.st.left > 0)
         .sort((x, y) => x.st.left - y.st.left || y.st.remain - x.st.remain);
       if (!ins.length) return '';
       const open = S.ui.instOpen === a.id, SHOW = 3, shown = open ? ins : ins.slice(0, SHOW);
       const monthly = ins.reduce((x, i) => x + i.st.per, 0);
       return `<div class="sec"><h3>分期中 <span class="sm tx2" style="font-weight:400">${ins.length} 筆</span></h3><span class="sm tx2">每月約 ${fmt(monthly, a.currency)} · 未入帳 ${fmt(ins.reduce((x, i) => x + i.st.remain, 0), a.currency)}</span></div>
-      <div class="list">${shown.map(({t, st}) => { const c0 = S.data.categories[t.catId], m = catMain(c0);
+      <div class="list">${shown.map(({t, pl, st}) => { if (pl) return `<button class="row" onclick="openPlan('${pl.id}')"><span class="cic" style="background:var(--acc)">${ic('card',20)}</span>
+          <span class="mid"><b>${esc(pl.name || (pl.kind === 'legacy' ? '舊分期' : '帳單分期'))}</b><small>${pl.kind === 'legacy' ? '舊分期' : '帳單分期'}${pl.fee > 0 ? `・手續費 ${fmt(pl.fee, a.currency)}` : ''}</small><small>${pl.kind === 'legacy' ? '' : `已繳 ${st.billed}/${pl.n} 期・`}<b style="display:inline;color:var(--pri)">剩 ${st.left} 期</b>・每期 ${fmt(st.per, a.currency)}</small></span>
+          <span class="amt">${fmt(st.remain, a.currency)}<small>到 ${st.last.slice(0, 7).replace('-', '/')}</small></span></button>`;
+        const c0 = S.data.categories[t.catId], m = catMain(c0);
         return `<button class="row" onclick="openAdd('${t.id}')"><span class="cic" style="background:${m ? m.color : '#aaa'}">${ic(m ? m.icon : 'more',20)}</span>
           <span class="mid"><b>${esc(c0 ? c0.name : '分期')}</b>${t.note ? `<small>${esc(t.note.split('\n')[0])}</small>` : ''}<small>已繳 ${st.billed}/${t.inst.n} 期・<b style="display:inline;color:var(--pri)">剩 ${st.left} 期</b>・每期 ${fmt(st.per, a.currency)}</small></span>
           <span class="amt">${fmt(st.remain, a.currency)}<small>到 ${st.last.slice(0, 7).replace('-', '/')}</small></span></button>`; }).join('')}
@@ -834,6 +870,51 @@ function viewAcct(){
       return `<div class="sec" style="margin:12px 20px 4px"><span class="sm b">${md(d)} ${wdName(d)}</span><span class="sm ${net < 0 ? 'exp' : 'inc'}">${fmt(net, a.currency, true)}</span></div><div class="list">${ts.map(t => txnRow(t, a.id, false, true)).join('')}</div>`; }).join('')
       : '<div class="list"><div class="empty">這個月沒有紀錄</div></div>'}<div style="height:20px"></div>`;
 }
+
+/* ---------- 帳單分期／舊分期、以帳單為準 ---------- */
+function planStatus(pl, ci){
+  const cut = ci ? ci.close : today(), ps = planPieces(pl), billed = ps.filter(p => p.date <= cut).length, rest = ps.slice(billed);
+  return {billed, left:rest.length, per:ps[0] ? ps[0].amt : 0, remain:rest.reduce((x, p) => x + p.amt, 0), last:ps.length ? ps[ps.length - 1].date : today()};
+}
+function setStmt(aid){
+  const a = S.data.accounts[aid], ci = cardInfo(a); if (!ci) return toast('請先設定結帳日、繳款截止日');
+  const v = prompt(`${md(ci.close)} 結帳的這一期，銀行帳單「本期應繳」是多少？\n（留空＝改回 App 自動推算）`, ci.manual ? ci.owed : '');
+  if (v === null) return;
+  const n = parseFloat(String(v).replace(/,/g, ''));
+  put('accounts', {...a, stmtOverride:v.trim() === '' || isNaN(n) ? null : {close:ci.close, amount:n}});
+  toast(v.trim() === '' ? '已改回自動推算' : '已以帳單金額為準');
+}
+let PF = null;
+function openPlan(id, aid){
+  const pl = id ? S.data.plans[id] : null, n = new Date(), nx = ds(new Date(n.getFullYear(), n.getMonth() + 1, 1)).slice(0, 7);
+  PF = pl ? {...pl, principal:String(pl.principal ?? ''), fee:String(pl.fee || ''), n:String(pl.n), per:pl.kind === 'legacy' ? String(Math.round(pl.principal / pl.n)) : ''}
+          : {id:null, accountId:aid, kind:'bill', name:'', principal:'', n:'', fee:'', per:'', firstMonth:nx};
+  openLayer('plan', renderPlan, 'btm');
+}
+function renderPlan(){
+  const f = PF, a = S.data.accounts[f.accountId], cur = a ? a.currency : 'TWD', legacy = f.kind === 'legacy';
+  const inp = (k, ph, mode = 'decimal') => `<input inputmode="${mode}" value="${esc(f[k])}" placeholder="${ph}" oninput="PF.${k}=this.value">`;
+  const body = `<div class="seg" style="margin-bottom:12px"><button style="flex:1" class="${!legacy ? 'on' : ''}" onclick="PF.kind='bill';redraw('plan')">整期帳單分期</button><button style="flex:1" class="${legacy ? 'on' : ''}" onclick="PF.kind='legacy';redraw('plan')">舊分期（剩幾期）</button></div>
+    <div class="hint" style="margin:0 0 12px">${legacy ? '記帳開始前就有的分期，消費沒記在 App 裡。只用來讓「本期應繳」和「分期中」正確，不會算支出，也不改變欠款。' : '整期帳單（好幾筆消費合計）向銀行轉分期。消費已經記過，不會重複算支出；手續費會按月算進支出。'}</div>
+    <div class="fld"><label>名稱</label><input value="${esc(f.name)}" placeholder="${legacy ? '例：iPhone 分期' : '例：9 月帳單分期'}" oninput="PF.name=this.value"></div>
+    ${legacy ? `<div class="two"><div class="fld"><label>剩餘期數</label>${inp('n', '例：4', 'numeric')}</div><div class="fld"><label>每期金額（${cur}，含手續費）</label>${inp('per', '例：2835')}</div></div>`
+      : `<div class="two"><div class="fld"><label>分期總額（${cur}）</label>${inp('principal', '例：50000')}</div><div class="fld"><label>期數</label>${inp('n', '例：3', 'numeric')}</div></div>
+         <div class="fld"><label>手續費／利息總額（沒有就留空）</label>${inp('fee', '例：600')}</div>`}
+    <div class="fld"><label>${legacy ? '下一期' : '第一期'}入帳月份</label><input type="month" value="${esc(f.firstMonth)}" onchange="PF.firstMonth=this.value"></div>
+    <button class="btn" onclick="savePlan()">儲存</button>${f.id ? `<button class="btn del" style="margin-top:6px" onclick="delPlan()">刪除</button>` : ''}`;
+  return sheet('plan', f.id ? '編輯分期' : '新增帳單分期', body);
+}
+function savePlan(){
+  const f = PF, n = parseInt(f.n);
+  if (!(n >= 1 && n <= 120)) return toast('期數要是 1–120');
+  if (!/^\d{4}-\d{2}$/.test(f.firstMonth || '')) return toast('請選擇月份');
+  let principal, fee = 0;
+  if (f.kind === 'legacy') { const per = parseFloat(f.per); if (!(per > 0)) return toast('請輸入每期金額'); principal = Math.round(per * n * 100) / 100; }
+  else { principal = parseFloat(f.principal); fee = parseFloat(f.fee) || 0; if (!(principal > 0)) return toast('請輸入分期總額'); }
+  put('plans', {id:f.id || 'pl_' + uid(), accountId:f.accountId, kind:f.kind, name:f.name.trim(), principal, n, fee, firstMonth:f.firstMonth, createdAt:f.createdAt || Date.now()}, true);
+  closeLayer('plan'); render(); toast('已儲存');
+}
+function delPlan(){ if (!confirm('刪除這個分期？')) return; const id = PF.id; closeLayer('plan'); del('plans', id); }
 
 /* account form */
 let AF = null;
@@ -882,7 +963,7 @@ function saveAcct(){
 }
 function delAcct(){
   const id = AF.id;
-  if (Object.values(S.data.txns).some(t => t.accountId === id || t.toAccountId === id)) return toast('有紀錄的帳戶不能刪除，請改用封存');
+  if (Object.values(S.data.txns).some(t => t.accountId === id || t.toAccountId === id) || Object.values(S.data.plans || {}).some(p => p.accountId === id)) return toast('有紀錄的帳戶不能刪除，請改用封存');
   if (!confirm('確定刪除？')) return;
   closeLayer('acf'); S.ui.tab = 'accounts'; del('accounts', id);
 }
@@ -1098,6 +1179,7 @@ function saveTxn(){
   const old = F.id ? S.data.txns[F.id] : null;
   const t = {...(old || {}), ...o, id:F.id || 't_' + uid(), date:F.date, createdAt:F.createdAt || Date.now()};
   delete t.inst;
+  if (t.type !== 'transfer') { delete t.toAccountId; delete t.toAmount; delete t.fee; }
   if (old && old.rate && (S.data.accounts[old.accountId]?.currency !== S.data.accounts[t.accountId]?.currency || old.amount !== t.amount)) delete t.rate;
   if (t.type === 'expense' && F.instN > 1 && S.data.accounts[t.accountId]?.type === 'credit') t.inst = {n:+F.instN, fee:evalExpr(F.instFeeExpr) || 0};
   if (t.type !== 'transfer') P.lastCat[t.type] = t.catId;
@@ -1323,7 +1405,7 @@ function viewReports(){
     const now = new Date(), ms = monthsBack(now.getFullYear(), now.getMonth(), 12), c = compute(), accs = Object.values(S.data.accounts).filter(a => a.inNW !== false);
     const rows = ms.map(([y, m]) => {
       const end = ds(new Date(y, m, dim(y, m))); let as = 0, li = 0;
-      for (const a of accs) { let b = +a.init || 0; for (const t of c.list) { if (t.date > end) break; b += delta(t, a.id); } const v = b * rate(a.currency); if (v >= 0) as += v; else li -= v; }
+      for (const a of accs) { let b = (+a.init || 0) - planFeeUpTo(a.id, end); for (const t of c.list) { if (t.date > end) break; b += delta(t, a.id); } const v = b * rate(a.currency); if (v >= 0) as += v; else li -= v; }
       return {m, as, li, net:as - li};
     });
     body = `<div class="card"><div class="sm tx2" style="margin-bottom:4px">近 12 個月淨資產（月底）</div>${lineChart(rows.map(x => x.m + 1), rows.map(x => x.net), 'var(--acc)')}</div>
@@ -1374,7 +1456,7 @@ async function bulkPut(col, arr){
   for (const o of arr) { o.updatedAt = now; S.data[col][o.id] = o; }
   bump();
   if (S.mode === 'cloud') {
-    const run = async L => { for (let i = 0; i < arr.length; i += 400) { const b = db.batch(); arr.slice(i, i + 400).forEach(o => b.set(L.collection(col).doc(o.id), o)); await b.commit(); } };
+    const run = async L => { for (let i = 0; i < arr.length; i += 400) { const b = db.batch(); arr.slice(i, i + 400).forEach(o => b.set(L.collection(col).doc(o.id), clean(o))); await b.commit(); } };
     if (ledgerRef) await run(ledgerRef); else PENDING.push(L => run(L).catch(e => toast('同步失敗：' + (e.code || e.message))));
   } else saveLocal();
 }
@@ -1647,7 +1729,7 @@ async function doJsonImport(){
   const j = IMP.json; closeLayer('imp'); toast('還原中…');
   try {
     for (const col of COLS) await bulkPut(col, Object.values(j.data[col] || {}).map(o => ({...o})));
-    if (j.settings) { const {carrier, theme, custom, rateOverride} = j.settings; putSettings({carrier:carrier || S.settings.carrier, theme:theme || S.settings.theme, custom:custom || S.settings.custom, rateOverride:rateOverride || {}}); }
+    if (j.settings) putSettings({...j.settings, carrier:j.settings.carrier || S.settings.carrier, rateOverride:j.settings.rateOverride || {}});
     render(); toast(`已還原 ${Object.keys(j.data.txns || {}).length} 筆`);
   } catch(e) { toast('還原失敗：' + (e.code || e.message)); }
 }
@@ -1737,7 +1819,7 @@ function srMatch(){
   const words = SR.q.trim().toLowerCase().split(/\s+/).filter(Boolean), mn = parseFloat(SR.min), mx = parseFloat(SR.max);
   return compute().list.filter(t => {
     if (SR.type && t.type !== SR.type) return false;
-    if (SR.acc && t.accountId !== SR.acc && t.toAccountId !== SR.acc) return false;
+    if (SR.acc && t.accountId !== SR.acc && !(t.type === 'transfer' && t.toAccountId === SR.acc)) return false;
     if (SR.cat && !inCatId(t.catId, SR.cat)) return false;
     if (SR.proj && t.projectId !== SR.proj) return false;
     if (SR.from && t.date < SR.from) return false;
@@ -2003,7 +2085,7 @@ async function batchWrite(lref, data){
   const now = Date.now();
   for (const col of COLS) for (const o of Object.values(data[col] || {})) ops.push([col, {...o, updatedAt:o.updatedAt || now}]);
   for (let i = 0; i < ops.length; i += 400) {
-    const b = db.batch(); ops.slice(i, i + 400).forEach(([col, o]) => b.set(lref.collection(col).doc(o.id), o)); await b.commit();
+    const b = db.batch(); ops.slice(i, i + 400).forEach(([col, o]) => b.set(lref.collection(col).doc(o.id), clean(o))); await b.commit();
   }
 }
 /* ---------- 秒開：把上次的資料存在手機裡，開 App 先顯示，再背景同步 ---------- */
@@ -2019,7 +2101,7 @@ function snapSave(){
 }
 async function snapClear(){ try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').delete('snap'); } catch(e) {} }
 function readyOnce(){ if (READY_ONCE) return; READY_ONCE = true; afterReady(); }
-const emptyData = () => ({accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}});
+const emptyData = () => ({accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}});
 
 async function attachLedger(u, keep){
   if (!keep) { S.ready = false; render(); }
@@ -2102,7 +2184,7 @@ function boot(){
   } else {
     S.mode = 'local';
     const l = readLocal();
-    if (l && l.data) { S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, ...l.data}; S.settings = {...S.settings, ...(l.settings || {})}; }
+    if (l && l.data) { S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}, ...l.data}; S.settings = {...S.settings, ...(l.settings || {})}; }
     else { S.data = defaultData(); saveLocal(); }
     if (!S.settings.carrier && P.carrier) S.settings.carrier = P.carrier;
     S.ready = true; bump(); applyTheme(); render(); afterReady();
