@@ -1,0 +1,2121 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="theme-color" content="#FAF8F7">
+<title>Money</title>
+<link rel="apple-touch-icon" id="touchIcon">
+<link rel="icon" id="favIcon">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{--pri:#C0707C;--acc:#2A8378;--pri-s:#F5E4E6;--acc-s:#DDEFEC;--bg:#FAF8F7;--card:#FFFFFF;--tx:#2A2626;--tx2:#8C8483;--line:#EEE8E6;--exp:#D2504A;--inc:#2F7BD0;--sh:0 1px 3px rgba(60,40,40,.06)}
+[data-mode=dark]{--bg:#151314;--card:#211E1F;--tx:#EEE8E7;--tx2:#9A918F;--line:#332E2F;--exp:#F0726B;--inc:#66A8F0;--sh:none}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:15px;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--tx)}
+#app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+.top{display:flex;align-items:center;justify-content:space-between;padding:calc(14px + env(safe-area-inset-top)) 18px 6px;gap:10px}
+.top h1{font-size:22px;margin:0;font-weight:700;letter-spacing:.5px}
+.top .ib{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:var(--tx);position:relative}
+.top .ib.on{background:var(--pri-s);color:var(--pri)}
+.brand{font-size:13px;color:var(--pri);font-weight:700;letter-spacing:2px}
+.card{background:var(--card);border-radius:20px;margin:10px 16px;padding:16px;box-shadow:var(--sh)}
+.tx2{color:var(--tx2)}.exp{color:var(--exp)}.inc{color:var(--inc)}
+.mt0{margin-top:0}.sm{font-size:12px}.b{font-weight:700}
+/* week strip */
+.week{display:flex;align-items:center;margin:4px 8px 0}
+.week .arr{width:28px;height:56px;display:grid;place-items:center;color:var(--tx2)}
+.days{flex:1;display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.day{display:flex;flex-direction:column;align-items:center;padding:6px 0 8px;border-radius:14px}
+.day small{font-size:11px;color:var(--tx2)}
+.day b{font-size:17px;margin-top:3px;font-weight:600}
+.day i{width:5px;height:5px;border-radius:50%;margin-top:4px;background:transparent}
+.day.has i{background:var(--acc)}
+.day.today b{color:var(--acc)}
+.day.sel{background:var(--pri);}
+.day.sel small,.day.sel b{color:#fff}.day.sel.has i{background:#fff}
+/* summary */
+.sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sum3 small{display:block;font-size:12px;color:var(--tx2);margin-bottom:4px}
+.sum3 b{font-size:18px;font-weight:700;letter-spacing:.2px}
+.per{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 16px}
+.per div{background:var(--card);border-radius:16px;padding:10px 12px;box-shadow:var(--sh)}
+.per small{font-size:12px;color:var(--tx2)}
+.per p{margin:4px 0 0;font-size:13px;font-weight:600;line-height:1.35}
+.alert{margin:8px 16px 0;padding:10px 14px;border-radius:14px;background:var(--pri-s);color:var(--tx);font-size:13px;display:flex;gap:8px;align-items:center}
+.alert.warn{background:#FDE7E4;color:#9B2C24}
+[data-mode=dark] .alert.warn{background:#4A2522;color:#FFB4AC}
+.sec{display:flex;justify-content:space-between;align-items:baseline;margin:18px 20px 6px}
+.sec h3{margin:0;font-size:15px}
+/* list */
+.list{background:var(--card);border-radius:20px;margin:0 16px;overflow:hidden;box-shadow:var(--sh)}
+.row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);width:100%;text-align:left}
+.row:last-child{border-bottom:0}
+.cic{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:#fff;flex:none}
+.row .mid{flex:1;min-width:0}
+.row .mid b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .mid small{display:block;color:var(--tx2);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .amt{text-align:right;font-weight:700;white-space:nowrap}
+.row .amt small{display:block;font-weight:400;font-size:11px;color:var(--tx2)}
+.empty{padding:28px;text-align:center;color:var(--tx2);font-size:14px}
+/* nav */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav .in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);height:62px;align-items:center}
+nav button{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--tx2)}
+nav button.on{color:var(--pri)}
+nav .fab{width:54px;height:54px;border-radius:18px;background:var(--acc);color:#fff;margin:-22px auto 0;display:grid;place-items:center;box-shadow:0 6px 16px rgba(0,0,0,.18)}
+/* accounts */
+.nw{display:flex;justify-content:space-between;align-items:flex-end}
+.nw .big{font-size:30px;font-weight:800;letter-spacing:.3px}
+.nw .r{text-align:right;font-size:13px;line-height:1.7}
+.grp{display:flex;justify-content:space-between;margin:16px 20px 6px;font-size:13px;color:var(--tx2)}
+.grip{color:var(--tx2);padding:6px;display:none}
+.sorting .grip{display:block}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv small{display:block;color:var(--tx2);font-size:12px}
+.kv b{font-size:16px}
+/* layers */
+#layers .layer{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;opacity:0;transition:opacity .18s}
+#layers .layer.on{opacity:1}
+.layer.full{background:var(--bg)}
+.layer.full .lin{max-width:520px;width:100%;margin:0 auto;height:100%;display:flex;flex-direction:column}
+.layer.btm{justify-content:flex-end}
+.bd{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.sh{position:relative;background:var(--card);border-radius:22px 22px 0 0;max-height:86vh;display:flex;flex-direction:column;max-width:520px;width:100%;margin:0 auto;padding-bottom:env(safe-area-inset-bottom)}
+.sh .hd{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 10px;font-weight:700;font-size:16px}
+.sh .bdy{overflow:auto;padding:0 18px 18px}
+.lhd{display:flex;align-items:center;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 12px 8px;gap:8px}
+.lhd .ib{width:40px;height:40px;display:grid;place-items:center;border-radius:12px}
+.lhd h2{margin:0;font-size:17px}
+.seg{display:flex;background:var(--line);border-radius:12px;padding:3px}
+.seg button{padding:7px 16px;border-radius:9px;font-size:14px;color:var(--tx2);font-weight:600}
+.seg button.on{background:var(--card);color:var(--tx);box-shadow:var(--sh)}
+.seg.exp button.on{color:var(--exp)}.seg.inc button.on{color:var(--inc)}.seg.tra button.on{color:var(--acc)}
+/* add form */
+.fscroll{flex:1;overflow:auto;padding-bottom:8px}
+.ftop{display:flex;gap:12px;align-items:stretch;margin:6px 16px 10px}
+.catbtn{background:var(--card);border-radius:18px;padding:10px;display:flex;align-items:center;gap:10px;min-width:150px;box-shadow:var(--sh);text-align:left}
+.catbtn .cn small{display:block;font-size:11px;color:var(--tx2)}
+.catbtn .cn b{font-size:15px}
+.amtbox{flex:1;background:var(--card);border-radius:18px;padding:10px 14px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;box-shadow:var(--sh);min-width:0}
+.amtbox .ex{font-size:12px;color:var(--tx2);word-break:break-all;text-align:right}
+.amtbox .big{font-size:32px;font-weight:800;line-height:1.1;word-break:break-all;text-align:right}
+.amtbox.expense .big{color:var(--exp)}.amtbox.income .big{color:var(--inc)}
+.trw{margin:6px 16px 10px;display:grid;grid-template-columns:1fr 36px 1fr;gap:8px;align-items:center}
+.chip{position:relative;background:var(--card);border-radius:16px;padding:10px;display:flex;align-items:center;gap:8px;box-shadow:var(--sh);min-width:0}
+.chip span.n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.swap{width:36px;height:36px;border-radius:12px;background:var(--acc-s);color:var(--acc);display:grid;place-items:center}
+.tamts{margin:0 16px 10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tbox{background:var(--card);border-radius:16px;padding:10px 12px;border:2px solid transparent;box-shadow:var(--sh);text-align:left}
+.tbox.on{border-color:var(--acc)}
+.tbox small{display:block;font-size:12px;color:var(--tx2)}
+.tbox b{display:block;font-size:22px;font-weight:800;margin-top:2px;word-break:break-all}
+.tbox .ex{font-size:11px;color:var(--tx2)}
+.ov{position:absolute;inset:0;opacity:0;width:100%;height:100%;-webkit-appearance:none;appearance:none;border:0}
+.frow{position:relative;margin:0 16px 8px;background:var(--card);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;min-height:48px;box-shadow:var(--sh);border:2px solid transparent}
+.frow.on{border-color:var(--acc)}
+.frow .lb{color:var(--tx2);font-size:13px;width:44px;flex:none}
+.frow .vl{flex:1;display:flex;justify-content:space-between;gap:8px;min-width:0}
+.frow.date{justify-content:space-between;padding:6px}
+.frow.date button{width:40px;height:36px;display:grid;place-items:center;color:var(--tx2)}
+.frow.date label{position:relative;flex:1;text-align:center;font-weight:600}
+textarea.note{display:block;width:calc(100% - 32px);margin:0 16px 8px;border:0;border-radius:14px;padding:12px 14px;background:var(--card);resize:none;min-height:64px;box-shadow:var(--sh);outline:none}
+.kp{background:var(--card);border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(4,50px);gap:7px}
+.typing .kp{display:none}
+.kp button{border-radius:14px;background:var(--bg);font-size:21px;font-weight:600}
+.kp .op{background:var(--pri-s);color:var(--pri)}
+.kp .ok{grid-column:5;grid-row:3/5;background:var(--acc);color:#fff;font-size:18px}
+.kp button:active{filter:brightness(.92)}
+/* cat picker */
+.cp{display:grid;grid-template-columns:1fr 1fr;gap:0;flex:1;min-height:0}
+.cp .col{overflow:auto;padding:4px 8px 16px}
+.cp .col+.col{border-left:1px solid var(--line)}
+.cpi{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;width:100%;text-align:left}
+.cpi.on{background:var(--pri-s)}
+.cpi .cic{width:34px;height:34px;border-radius:11px}
+.cpi.add{color:var(--pri)}
+/* forms */
+.fld{margin-bottom:12px}
+.fld label{display:block;font-size:12px;color:var(--tx2);margin-bottom:5px}
+.fld input,.fld select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;outline:none}
+.fld input:focus,.fld select:focus{border-color:var(--acc)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{display:block;width:100%;padding:13px;border-radius:14px;background:var(--acc);color:#fff;font-weight:700;text-align:center}
+.btn.sec2{background:var(--bg);color:var(--tx);border:1px solid var(--line)}
+.btn.del{background:transparent;color:var(--exp)}
+.sw{display:flex;flex-wrap:wrap;gap:8px}
+.sw button{width:32px;height:32px;border-radius:10px;border:3px solid transparent}
+.sw button.on{border-color:var(--tx)}
+.igrid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+.igrid button{aspect-ratio:1;border-radius:10px;display:grid;place-items:center;background:var(--bg);color:var(--tx2)}
+.igrid button.on{background:var(--pri);color:#fff}
+.tog{display:flex;align-items:center;justify-content:space-between;padding:6px 0}
+.tog input{width:22px;height:22px;accent-color:var(--acc)}
+/* settings */
+.set .row{min-height:52px}
+.thm{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.thm button{border-radius:14px;padding:10px 8px;background:var(--bg);border:2px solid transparent;font-size:12px}
+.thm button.on{border-color:var(--pri)}
+.thm .dots{display:flex;justify-content:center;gap:4px;margin-bottom:6px}
+.thm .dots i{width:16px;height:16px;border-radius:50%}
+/* carrier */
+.bc{background:#fff;border-radius:20px;margin:16px;padding:22px 10px;text-align:center;box-shadow:var(--sh)}
+.bc svg{width:100%;height:auto;max-height:150px}
+.bc .code{color:#111;font-size:28px;font-weight:800;letter-spacing:4px;margin-top:8px;font-family:ui-monospace,Menlo,monospace}
+.hint{margin:6px 22px;font-size:13px;color:var(--tx2);line-height:1.6}
+/* cat manager */
+.cm-main{background:var(--bg);border-radius:16px;padding:10px;margin-bottom:10px}
+.cm-h{display:flex;align-items:center;gap:10px}
+.cm-h b{flex:1}
+.cm-subs{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.cm-subs span{background:var(--card);border-radius:10px;padding:5px 6px 5px 10px;font-size:13px;display:inline-flex;align-items:center;gap:4px}
+.cm-subs span button{color:var(--tx2);width:20px;height:20px;display:grid;place-items:center}
+.mini{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;color:var(--tx2)}
+.addchip{color:var(--pri)!important;background:transparent!important;border:1px dashed var(--pri)}
+.rbar{display:flex;align-items:center;justify-content:space-between;margin:4px 16px 0;gap:8px}
+.rbar .nav2{display:flex;align-items:center;gap:2px;font-weight:700}
+.rbar .nav2 button{width:34px;height:34px;display:grid;place-items:center;color:var(--tx2)}
+.segw{display:flex;justify-content:center;margin:2px 16px 6px}.segw .seg{width:100%}.segw .seg button{flex:1;padding:8px 4px}
+.donut{display:flex;justify-content:center;padding:6px 0 2px}
+.pbar{height:5px;border-radius:3px;background:var(--line);margin-top:6px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:3px}
+.chart svg{width:100%;height:auto;display:block}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--tx2);margin-top:6px;justify-content:center}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{font-weight:500;color:var(--tx2);text-align:right;padding:6px 4px;border-bottom:1px solid var(--line)}
+.tbl td{text-align:right;padding:8px 4px;border-bottom:1px solid var(--line)}
+.tbl th:first-child,.tbl td:first-child{text-align:left}
+.tbl tr:last-child td{border-bottom:0}
+.mcal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.mcal .wh{font-size:11px;color:var(--tx2);padding:4px 0}
+.mcal button{display:flex;flex-direction:column;align-items:center;padding:6px 0 4px;border-radius:12px;min-height:52px}
+.mcal button b{font-size:15px;font-weight:600}
+.mcal button i{width:5px;height:5px;border-radius:50%;margin-top:3px;background:transparent}
+.mcal button.has i{background:var(--acc)}
+.mcal button small{font-size:9px;color:var(--exp);margin-top:1px;white-space:nowrap}
+.mcal button.today b{color:var(--acc)}
+.mcal button.sel{background:var(--pri)}.mcal button.sel b,.mcal button.sel small{color:#fff}.mcal button.sel.has i{background:#fff}
+.mcal .out{visibility:hidden}
+.chips{display:flex;gap:6px;overflow-x:auto;margin:0 16px 8px;padding:2px 0;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;background:var(--card);border-radius:12px;padding:7px 12px;font-size:13px;box-shadow:var(--sh);white-space:nowrap;border:1px solid var(--line)}
+#lock{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.lk{display:flex;flex-direction:column;align-items:center;width:260px;color:var(--tx)}
+.dots4{display:flex;gap:16px;margin-bottom:28px}.dots4 i{width:14px;height:14px;border-radius:50%;border:2px solid var(--pri)}.dots4 i.on{background:var(--pri)}
+.dots4.shake{animation:shk .35s}@keyframes shk{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.lkp{display:grid;grid-template-columns:repeat(3,72px);gap:14px}.lkp button{height:72px;border-radius:50%;background:var(--card);font-size:26px;box-shadow:var(--sh);display:grid;place-items:center}
+a[href*="netlify.com"],[id*="netlify" i],[class*="netlify" i]{display:none!important}
+.tap{cursor:pointer;border-radius:12px;transition:background .15s}.tap:active{background:var(--pri-s)}
+#swipeback{position:fixed;left:0;top:0;z-index:400;width:44px;height:44px;border-radius:50%;background:var(--card);color:var(--pri);box-shadow:0 2px 10px rgba(0,0,0,.25);display:grid;place-items:center;opacity:0;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:calc(100px + env(safe-area-inset-bottom));transform:translateX(-50%);background:rgba(30,26,27,.9);color:#fff;padding:10px 18px;border-radius:12px;font-size:14px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+.login{max-width:380px;margin:0 auto;padding:calc(70px + env(safe-area-inset-top)) 24px 40px}
+.login h1{font-size:34px;color:var(--pri);margin:0 0 6px;letter-spacing:2px}
+.ghost-sortable{opacity:.4}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<nav id="nav"></nav>
+<div id="layers"></div>
+<div id="toast"></div>
+<script>
+/* =========================================================
+   Money v1.0
+   1) 尚未設定 Firebase 時 = 本機模式（資料存在這支手機的瀏覽器）
+   2) 設定好後，把 Firebase 主控台的 firebaseConfig 貼到下面，即自動切換雲端同步
+   ---------------------------------------------------------
+   Firestore 規則（貼到 Firestore → 規則）：
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+       match /ledgers/{lid} {
+         allow read, update: if request.auth != null && request.auth.uid in resource.data.members;
+         allow create: if request.auth != null && request.auth.uid in request.resource.data.members;
+         match /{col}/{doc} {
+           allow read, write: if request.auth != null &&
+             request.auth.uid in get(/databases/$(database)/documents/ledgers/$(lid)).data.members;
+         }
+       }
+     }
+   }
+   ========================================================= */
+// 雲端設定放在同資料夾的 config.js（換人使用時只要改那個檔）
+const FIREBASE_CONFIG = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey) ? window.FIREBASE_CONFIG : null;
+/* 範例：
+const FIREBASE_CONFIG = {
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+};
+*/
+const VERSION = 'v2.9';
+
+/* ---------- utils ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const pad = n => String(n).padStart(2, '0');
+const ds = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const pd = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const today = () => ds(new Date());
+const addD = (s, n) => { const d = pd(s); d.setDate(d.getDate()+n); return ds(d); };
+const dim = (y, m) => new Date(y, m+1, 0).getDate();
+const wkStart = s => { const d = pd(s); d.setDate(d.getDate() - (d.getDay()+6)%7); return ds(d); };
+const diffD = (a, b) => Math.round((pd(a) - pd(b)) / 86400000);
+const WD = ['日','一','二','三','四','五','六'];
+const wdName = s => '週' + WD[pd(s).getDay()];
+const md = s => { const d = pd(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const longDate = s => { const d = pd(s); return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())}（${WD[d.getDay()]}）`; };
+
+const CUR = {
+  TWD:{sym:'$',dec:0,name:'新台幣'}, JPY:{sym:'¥',dec:0,name:'日圓'}, USD:{sym:'US$',dec:2,name:'美元'},
+  HKD:{sym:'HK$',dec:2,name:'港幣'}, EUR:{sym:'€',dec:2,name:'歐元'}, KRW:{sym:'₩',dec:0,name:'韓元'},
+  CNY:{sym:'CN¥',dec:2,name:'人民幣'}, THB:{sym:'฿',dec:2,name:'泰銖'}, SGD:{sym:'S$',dec:2,name:'新加坡幣'},
+  SAR:{sym:'SAR ',dec:2,name:'沙烏地里亞爾'}, VND:{sym:'₫',dec:0,name:'越南盾'}, MYR:{sym:'RM',dec:2,name:'馬幣'},
+  GBP:{sym:'£',dec:2,name:'英鎊',hide:true}, AUD:{sym:'A$',dec:2,name:'澳幣',hide:true}, PHP:{sym:'₱',dec:2,name:'披索',hide:true}
+};
+const FALLBACK_RATE = {JPY:.21,USD:32,HKD:4.1,EUR:35,KRW:.023,CNY:4.45,THB:.95,SGD:24.5,SAR:8.5,GBP:42,AUD:21,VND:.00125,MYR:7.2,PHP:.56};
+const nf = (n, dec) => Number(n).toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:dec});
+function fmt(n, cur='TWD', sign=false){
+  const c = CUR[cur] || CUR.TWD; const v = Math.abs(n) < 1e-9 ? 0 : n;
+  const s = (v < 0 ? '-' : (sign && v > 0 ? '+' : '')) + c.sym + nf(Math.abs(v), c.dec);
+  return s;
+}
+const twd = (n, sign) => fmt(Math.round(n), 'TWD', sign);
+
+/* ---------- icons ---------- */
+const ICONS = {
+  food:'M7 3v8M5 3v4a2 2 0 0 0 4 0V3M7 11v10M17 3c-2 0-3 2-3 5s1 4 3 4v9',
+  home:'M3 11l9-7 9 7M5 10v10h14V10M10 20v-6h4v6',
+  phone:'M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2',
+  car:'M5 16v-5l2-5h10l2 5v5M3 16h18v3H3zM7 19v2M17 19v2M5 11h14',
+  book:'M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z',
+  star:'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z',
+  bag:'M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2',
+  family:'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3 3-5 6-5s6 2 6 5M16 5.5a2.5 2.5 0 0 1 0 5M18 15c2 .6 3 2.3 3 5',
+  health:'M12 21s-8-5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 10c0 6-8 11-8 11zM12 10v5M9.5 12.5h5',
+  gift:'M4 10h16v11H4zM3 7h18v3H3zM12 7v14M12 7c-1-3-5-4-5-1s5 1 5 1zM12 7c1-3 5-4 5-1s-5 1-5 1z',
+  bank:'M3 10l9-6 9 6M5 10v8M9 10v8M15 10v8M19 10v8M3 21h18',
+  more:'M6 12h.01M12 12h.01M18 12h.01',
+  work:'M4 7h16v13H4zM9 7V5h6v2M4 13h16',
+  coin:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM15 9.5c-.4-1-1.6-1.6-3-1.6-1.7 0-3 .8-3 1.9s1.3 1.6 3 2 3 .9 3 2-1.3 1.9-3 1.9c-1.4 0-2.6-.6-3-1.6M12 6v12',
+  sparkle:'M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6',
+  plane:'M10 14l-7-3 1-2 9 1 4-5a2 2 0 0 1 3 3l-5 4 1 9-2 1-3-7',
+  paw:'M8 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM16 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM5 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM19 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM12 12c-3 0-5 3.5-5 6 0 2 2 2.5 5 1.5 3 1 5 .5 5-1.5 0-2.5-2-6-5-6z',
+  cup:'M4 8h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6zM17 9h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3',
+  cash:'M2 6h20v12H2zM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM6 9v6M18 9v6',
+  card:'M2 5h20v14H2zM2 10h20M6 15h4',
+  wallet:'M3 6h15a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H3zM3 6V5a2 2 0 0 1 2-2h11v3M16 13h.01',
+  swap:'M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
+  plus:'M12 5v14M5 12h14',
+  homeNav:'M4 10l8-6 8 6v10h-5v-6H9v6H4z',
+  barcode:'M4 5v14M7 5v14M10 5v10M13 5v14M16 5v10M19 5v14',
+  gear:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
+  left:'M15 6l-6 6 6 6', right:'M9 6l6 6-6 6', down:'M6 9l6 6 6-6',
+  cal:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
+  x:'M6 6l12 12M18 6L6 18',
+  trash:'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
+  edit:'M4 20h4L19 9l-4-4L4 16zM14 6l4 4',
+  sort:'M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4',
+  grip:'M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01',
+  back:'M9 5h11v14H9l-6-7zM12 9l5 6M17 9l-5 6',
+  folder:'M3 6h6l2 2h10v11H3z',
+  bell:'M6 17V11a6 6 0 0 1 12 0v6l2 2H4zM10 21h4',
+  pie:'M12 3a9 9 0 1 0 9 9h-9zM15 2.5A9 9 0 0 1 21.5 9H15z',
+  copy:'M9 9h11v11H9zM5 15V4h11',
+  bookmark:'M6 3h12v18l-6-4-6 4z',
+  search:'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM20 20l-4.5-4.5',
+  lock:'M6 11h12v10H6zM8 11V8a4 4 0 0 1 8 0v3',
+  repeat:'M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3',
+  target:'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
+  refresh:'M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4'
+};
+const CAT_ICONS = ['food','cup','home','phone','car','plane','book','star','bag','family','paw','health','gift','bank','work','coin','sparkle','cash','card','wallet','folder','more'];
+const PALETTE = ['#E8845C','#8CB369','#F2A07B','#5BC0BE','#D1495B','#4FB286','#D4B83A','#F4A79D','#E36588','#7AA6D9','#6C7A89','#A0A0A0','#3E9BD6','#2F855A','#9B72CF','#C0707C','#2A8378','#19486A','#FD9D24','#E5243B'];
+function ic(n, s=22, w=1.8){
+  const sw = n === 'more' || n === 'grip' ? 3.2 : w;
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"><path d="${ICONS[n] || ICONS.more}"/></svg>`;
+}
+
+/* ---------- default data ---------- */
+const DEF_CATS = {
+  expense:[
+    ['飲食','food','#E8845C',['早餐','午餐','晚餐','宵夜','飲料','零食點心','食材','水果','咖啡']],
+    ['住家','home','#8CB369',['房租房貸','水費','電費','瓦斯','管理費','日用品','家具家電']],
+    ['電信','phone','#F2A07B',['手機費','網路費']],
+    ['交通','car','#5BC0BE',['加油','停車','大眾運輸','計程車','保養維修','過路費']],
+    ['學習','book','#D1495B',['書籍','課程']],
+    ['娛樂','star','#4FB286',['電影','旅遊','運動','遊戲']],
+    ['購物','bag','#D4B83A',['服飾','3C','美妝','網購']],
+    ['家庭','family','#F4A79D',['孩子','孝親','寵物']],
+    ['醫療','health','#E36588',['看診','藥品','保健']],
+    ['送禮捐贈','gift','#7AA6D9',['送禮','紅包','捐款']],
+    ['金融','bank','#6C7A89',['手續費','利息','保險','稅金']],
+    ['其他','more','#A0A0A0',['其他']]
+  ],
+  income:[
+    ['主動收入','work','#3E9BD6',['薪資','代墊回補','講師費','獎金','退稅','營業收入','兼職']],
+    ['被動收入','coin','#6C757D',['利息','股利','租金']],
+    ['意外收入','sparkle','#2F855A',['中獎','紅包','其他']]
+  ]
+};
+const FEE_CAT = 'c_e10_0';
+const COLS = ['accounts','txns','categories','projects','recurring','templates'];
+function defaultData(){
+  const categories = {};
+  for (const type of ['expense','income']) {
+    DEF_CATS[type].forEach(([name, icon, color, subs], i) => {
+      const pid = `c_${type[0]}${i}`;
+      categories[pid] = {id:pid, type, name, icon, color, parent:null, order:i, hidden:false};
+      subs.forEach((sn, j) => { const id = `${pid}_${j}`; categories[id] = {id, type, name:sn, icon, color, parent:pid, order:j, hidden:false}; });
+    });
+  }
+  const cashId = 'a_cash';
+  return {
+    accounts:{[cashId]:{id:cashId, name:'現金', type:'cash', currency:'TWD', init:0, order:0, color:'#4F6D7A', archived:false}},
+    txns:{}, categories, projects:{}, recurring:{}, templates:{}
+  };
+}
+
+/* ---------- state ---------- */
+const S = {
+  mode:'local', user:null, ledgerId:null, ready:false,
+  data:{accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}},
+  settings:{theme:'rose', custom:{pri:'#C0707C', acc:'#2A8378'}, carrier:'', rateOverride:{}},
+  ui:{tab:'home', sel:today(), acct:null, sorting:false, showArch:false, rp:{seg:'cat', per:'month', type:'expense', y:new Date().getFullYear(), m:new Date().getMonth()}}
+};
+// 同一網域放多份 Money（例如 GitHub Pages 的不同倉庫）時，各自的設定分開存，不互相干擾
+const STORE_NS = (() => { const d = location.pathname.replace(/[^/]*$/, ''); return d === '/' ? '' : '@' + d; })();
+const PREF_KEY = 'money_prefs' + STORE_NS, LOCAL_KEY = 'money_local_v1' + STORE_NS, RATE_KEY = 'money_rates';
+let P = {mode:'time', darkFrom:'22:00', darkTo:'08:00', lastCat:{}, lastAcc:null, carrier:''};
+try { Object.assign(P, JSON.parse(localStorage.getItem(PREF_KEY) || '{}')); } catch(e){}
+const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(P)); } catch(e){} };
+let RATES = {at:0, r:{}};
+try { RATES = JSON.parse(localStorage.getItem(RATE_KEY)) || RATES; } catch(e){}
+const rate = cur => cur === 'TWD' ? 1 : (+(S.settings.rateOverride || {})[cur] || RATES.r[cur] || FALLBACK_RATE[cur] || 1);
+
+let db = null, auth = null, ledgerRef = null, unsubs = [];
+let VER = 0; const bump = () => { VER++; };
+
+/* ---------- store ---------- */
+function readLocal(){ try { return JSON.parse(localStorage.getItem(LOCAL_KEY)); } catch(e){ return null; } }
+function saveLocal(){ if (S.mode !== 'local') return; try { localStorage.setItem(LOCAL_KEY, JSON.stringify({data:S.data, settings:S.settings})); } catch(e){ toast('儲存空間不足'); } }
+function put(col, obj, silent){
+  obj.updatedAt = Date.now();
+  S.data[col][obj.id] = obj; bump();
+  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection(col).doc(obj.id).set(obj).catch(e => toast('同步失敗：' + e.code));
+  else saveLocal();
+  if (!silent) render();
+}
+function del(col, id){
+  delete S.data[col][id]; bump();
+  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection(col).doc(id).set({id, deleted:true, updatedAt:Date.now()}).catch(e => toast('同步失敗：' + e.code));
+  else saveLocal();
+  render();
+}
+function putSettings(patch){
+  S.settings = {...S.settings, ...patch};
+  if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
+  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection('meta').doc('settings').set(S.settings, {merge:true});
+  else saveLocal();
+  applyTheme(); render();
+}
+
+/* ---------- compute ---------- */
+const byOrder = (a, b) => (a.order ?? 0) - (b.order ?? 0);
+const accList = (all) => Object.values(S.data.accounts).filter(a => all || !a.archived).sort(byOrder);
+const txnSort = (a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.createdAt || 0) - (b.createdAt || 0);
+const addM = (s, k) => { const d = pd(s), y = d.getFullYear(), m = d.getMonth() + k, yy = y + Math.floor(m / 12), mm = ((m % 12) + 12) % 12; return ds(new Date(yy, mm, Math.min(d.getDate(), dim(yy, mm)))); };
+const instFee = t => (t.type === 'expense' && t.inst && t.inst.n > 1) ? (+t.inst.fee || 0) : 0;
+function instPieces(t){
+  const n = t.inst.n, dec = 0, f = 10 ** dec, out = [], fee = instFee(t);
+  const pa = Math.floor(t.amount / n * f) / f, pf = Math.floor(fee / n * f) / f;
+  for (let k = 0; k < n; k++) out.push({date:addM(t.date, k), k, amt:k === n - 1 ? t.amount - pa * (n - 1) : pa, fee:k === n - 1 ? fee - pf * (n - 1) : pf});
+  return out;
+}
+function delta(t, aid){
+  let d = 0;
+  if (t.type === 'expense' && t.accountId === aid) d -= t.amount + instFee(t);
+  if (t.type === 'income' && t.accountId === aid) d += t.amount;
+  if (t.type === 'transfer') {
+    if (t.accountId === aid) d -= t.amount + (t.fee || 0);
+    if (t.toAccountId === aid) d += (t.toAmount || t.amount);
+  }
+  return d;
+}
+let CC = null;
+function compute(){
+  if (CC && CC.ver === VER) return CC;
+  const A = S.data.accounts, bal = {}, avg = {}, tw = {}, days = new Set();
+  for (const a of Object.values(A)) { bal[a.id] = +a.init || 0; avg[a.id] = a.currency === 'TWD' ? 1 : (+a.initRate || rate(a.currency)); }
+  const list = Object.values(S.data.txns).sort(txnSort), flows = [];
+  for (const t of list) {
+    days.add(t.date);
+    const a = A[t.accountId];
+    if (!a) { tw[t.id] = {amt:0, fee:0}; continue; }
+    if (t.type === 'expense') {
+      const r = t.rate || avg[a.id], fe = instFee(t);
+      tw[t.id] = {amt:t.amount * r, fee:fe * r}; bal[a.id] -= t.amount + fe;
+      if (t.inst && t.inst.n > 1) for (const p of instPieces(t)) {
+        flows.push({t, date:p.date, type:'expense', cat:t.catId, amt:p.amt * r, proj:t.projectId, k:p.k});
+        if (p.fee) flows.push({t, date:p.date, type:'expense', cat:FEE_CAT, amt:p.fee * r, proj:t.projectId, k:p.k});
+      } else flows.push({t, date:t.date, type:'expense', cat:t.catId, amt:t.amount * r, proj:t.projectId});
+    }
+    else if (t.type === 'income') { tw[t.id] = {amt:t.amount * (t.rate || avg[a.id]), fee:0}; bal[a.id] += t.amount; flows.push({t, date:t.date, type:'income', cat:t.catId, amt:tw[t.id].amt, proj:t.projectId}); }
+    else {
+      const T = A[t.toAccountId], ta = t.toAmount || t.amount, inTw = t.amount * avg[a.id];
+      tw[t.id] = {amt:inTw, fee:(t.fee || 0) * avg[a.id]};
+      if (t.fee) flows.push({t, date:t.date, type:'expense', cat:FEE_CAT, amt:tw[t.id].fee, proj:t.projectId});
+      bal[a.id] -= t.amount + (t.fee || 0);
+      if (T) {
+        if (T.currency !== 'TWD' && ta > 0) {
+          const pu = inTw / ta, pb = bal[T.id];
+          avg[T.id] = pb > 0 ? (pb * avg[T.id] + ta * pu) / (pb + ta) : pu;
+        }
+        bal[T.id] += ta;
+      }
+    }
+  }
+  flows.sort((x, y) => x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
+  CC = {ver:VER, bal, avg, tw, days, list, flows};
+  return CC;
+}
+function flowsIn(from, to){
+  const f = compute().flows; let lo = 0, hi = f.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (f[m].date < from) lo = m + 1; else hi = m; }
+  const out = []; for (let i = lo; i < f.length && f[i].date <= to; i++) out.push(f[i]); return out;
+}
+function summary(from, to){
+  let exp = 0, inc = 0;
+  for (const f of flowsIn(from, to)) { if (f.type === 'expense') exp += f.amt; else inc += f.amt; }
+  return {exp, inc};
+}
+function netWorth(){
+  const c = compute(); let as = 0, li = 0;
+  for (const a of Object.values(S.data.accounts)) {
+    if (a.inNW === false) continue;
+    const v = (c.bal[a.id] || 0) * rate(a.currency);
+    if (v >= 0) as += v; else li += -v;
+  }
+  return {as, li, net:as - li};
+}
+function cardInfo(a){
+  if (a.type !== 'credit' || !a.closeDay || !a.dueDay) return null;
+  const t = new Date(), td = today();
+  let y = t.getFullYear(), m = t.getMonth();
+  let cd = Math.min(a.closeDay, dim(y, m));
+  if (t.getDate() < cd) { m--; if (m < 0) { m = 11; y--; } cd = Math.min(a.closeDay, dim(y, m)); }
+  const close = ds(new Date(y, m, cd));
+  let dy = y, dm = a.dueDay > a.closeDay ? m : m + 1;
+  if (dm > 11) { dm = 0; dy++; }
+  const due = ds(new Date(dy, dm, Math.min(a.dueDay, dim(dy, dm))));
+  const c = compute(); let stmt = +a.init || 0, paid = 0, unbilled = 0;
+  for (const x of c.list) {
+    if (x.type === 'expense' && x.accountId === a.id && x.inst && x.inst.n > 1) {
+      for (const p of instPieces(x)) { if (p.date <= close) stmt -= p.amt + p.fee; else unbilled += p.amt + p.fee; }
+      continue;
+    }
+    const d = delta(x, a.id); if (!d) continue;
+    if (x.date <= close) stmt += d; else if (d > 0) paid += d;
+  }
+  const owed = Math.max(0, -stmt), remain = Math.max(0, owed - paid);
+  const bal = c.bal[a.id] || 0;
+  return {close, due, owed, paid, remain, unbilled, left:diffD(due, td), over:bal > 0 ? bal : 0, avail:a.limit ? a.limit + Math.min(0, bal) + Math.max(0, bal) : null};
+}
+
+/* ---------- theme ---------- */
+const THEMES = {
+  rose:{name:'玫瑰青', pri:'#C0707C', acc:'#2A8378'},
+  lake:{name:'湖光', pri:'#D88A97', acc:'#1E9AA6'},
+  berry:{name:'莓果', pri:'#B4547C', acc:'#3B7EA6'},
+  forest:{name:'森林', pri:'#C47A66', acc:'#3E7D59'},
+  sdgs:{name:'SDGs 亮彩', pri:'#E5243B', acc:'#19486A'},
+  sun:{name:'晴空', pri:'#FD6925', acc:'#26BDE2'}
+};
+function hex2rgb(h){ h = h.replace('#',''); if (h.length === 3) h = h.split('').map(c => c+c).join(''); const n = parseInt(h, 16); return [n>>16 & 255, n>>8 & 255, n & 255]; }
+function mix(h1, h2, r){ const a = hex2rgb(h1), b = hex2rgb(h2); return '#' + a.map((v,i) => Math.round(v*(1-r) + b[i]*r).toString(16).padStart(2,'0')).join(''); }
+function inDarkHours(){
+  const m = s => { const [h, mm] = (s || '0:0').split(':').map(Number); return h * 60 + (mm || 0); };
+  const d = new Date(), now = d.getHours() * 60 + d.getMinutes(), f = m(P.darkFrom), t = m(P.darkTo);
+  return f === t ? false : f < t ? (now >= f && now < t) : (now >= f || now < t);
+}
+function effMode(){
+  if (P.mode === 'time') return inDarkHours() ? 'dark' : 'light';
+  return P.mode === 'auto' ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : P.mode;
+}
+setInterval(() => { if (P.mode === 'time' && document.documentElement.dataset.mode !== effMode()) applyTheme(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTheme(); });
+function applyTheme(){
+  const th = S.settings.theme === 'custom' ? S.settings.custom : (THEMES[S.settings.theme] || THEMES.rose);
+  const dark = effMode() === 'dark', r = document.documentElement;
+  r.dataset.mode = dark ? 'dark' : 'light';
+  r.style.setProperty('--pri', th.pri); r.style.setProperty('--acc', th.acc);
+  r.style.setProperty('--pri-s', dark ? mix(th.pri, '#211E1F', .72) : mix(th.pri, '#FFFFFF', .84));
+  r.style.setProperty('--acc-s', dark ? mix(th.acc, '#211E1F', .72) : mix(th.acc, '#FFFFFF', .84));
+  document.querySelector('meta[name=theme-color]').content = dark ? '#151314' : '#FAF8F7';
+  makeIcon(th.acc);
+}
+let iconFor = '';
+function makeIcon(color){
+  if (iconFor === color) return; iconFor = color;
+  const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
+  x.fillStyle = color; x.fillRect(0, 0, 180, 180);
+  x.fillStyle = '#fff'; x.font = 'bold 104px -apple-system,Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', 90, 96);
+  const u = c.toDataURL('image/png'); $('#touchIcon').href = u; $('#favIcon').href = u;
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); });
+
+/* ---------- toast ---------- */
+let tt; function toast(m){ const e = $('#toast'); e.textContent = m; e.classList.add('on'); clearTimeout(tt); tt = setTimeout(() => e.classList.remove('on'), 1800); }
+
+/* ---------- layers ---------- */
+const LAYERS = [];
+function openLayer(key, fn, cls='full', mount){
+  closeLayer(key, true);
+  const el = document.createElement('div'); el.className = 'layer ' + cls;
+  $('#layers').appendChild(el);
+  const L = {key, el, fn, mount}; LAYERS.push(L); drawLayer(L);
+  requestAnimationFrame(() => el.classList.add('on'));
+}
+function drawLayer(L){ L.el.innerHTML = L.fn(); L.mount && L.mount(L.el); }
+function redraw(key){ const L = LAYERS.find(l => l.key === key); if (L) drawLayer(L); }
+function closeLayer(key, instant){
+  const i = key ? LAYERS.findIndex(l => l.key === key) : LAYERS.length - 1;
+  if (i < 0) return; const [L] = LAYERS.splice(i, 1);
+  if (instant) L.el.remove(); else { L.el.classList.remove('on'); setTimeout(() => L.el.remove(), 180); }
+}
+const sheet = (key, title, body) => `<div class="bd" onclick="closeLayer('${key}')"></div><div class="sh"><div class="hd"><span>${title}</span><button class="mini" onclick="closeLayer('${key}')">${ic('x',20)}</button></div><div class="bdy">${body}</div></div>`;
+
+/* ---------- render ---------- */
+function render(){
+  if (S.mode === 'cloud' && !S.user) { $('#nav').innerHTML = ''; return renderLogin(); }
+  if (!S.ready) { $('#app').innerHTML = '<div class="empty" style="padding-top:40vh">載入中…</div>'; return; }
+  const v = {home:viewHome, accounts:viewAccounts, acct:viewAcct, carrier:viewCarrier, settings:viewSettings, reports:viewReports}[S.ui.tab] || viewHome;
+  $('#app').innerHTML = v();
+  renderNav();
+  if (S.ui.tab === 'carrier') drawBarcode();
+  if (S.ui.tab === 'accounts' && S.ui.sorting) mountSort();
+  if (S.ui.tab === 'home') mountSwipe();
+}
+function renderNav(){
+  const t = S.ui.tab, on = k => (t === k || (k === 'accounts' && t === 'acct')) ? 'on' : '';
+  $('#nav').innerHTML = `<div class="in">
+    <button class="${on('home')}" onclick="go('home')">${ic('homeNav',24)}首頁</button>
+    <button class="${on('reports')}" onclick="go('reports')">${ic('pie',24)}報表</button>
+    <button onclick="openAdd()"><span class="fab">${ic('plus',28,2.4)}</span></button>
+    <button class="${on('accounts')}" onclick="go('accounts')">${ic('wallet',24)}帳戶</button>
+    <button class="${on('settings')}" onclick="go('settings')">${ic('gear',24)}設定</button></div>`;
+}
+function go(tab){ if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
+
+/* ---------- home ---------- */
+function catOf(id){ return S.data.categories[id]; }
+function catMain(c){ return c && c.parent ? S.data.categories[c.parent] : c; }
+function txnRow(t, forAcct, withDate, noDate){
+  const c = compute(), A = S.data.accounts, a = A[t.accountId];
+  let icon, color, title, sub = [], amt, cls, small = '';
+  if (t.type === 'transfer') {
+    const b = A[t.toAccountId];
+    icon = 'swap'; color = 'var(--acc)'; title = `${a ? a.name : '?'} → ${b ? b.name : '?'}`;
+    if (forAcct) { const d = delta(t, forAcct), cur = A[forAcct]?.currency || 'TWD'; amt = fmt(d, cur, true); cls = d < 0 ? 'exp' : 'inc'; }
+    else { amt = fmt(t.amount, a ? a.currency : 'TWD'); cls = 'tx2'; if (b && a && b.currency !== a.currency) small = '→ ' + fmt(t.toAmount, b.currency); }
+    if (t.fee) sub.push('手續費 ' + fmt(t.fee, a ? a.currency : 'TWD'));
+  } else {
+    const cat = catOf(t.catId), m = catMain(cat);
+    icon = m ? m.icon : 'more'; color = m ? m.color : '#aaa'; title = cat ? cat.name : '未分類';
+    const cur = a ? a.currency : 'TWD';
+    amt = fmt(t.type === 'expense' ? -t.amount : t.amount, cur, true); cls = t.type === 'expense' ? 'exp' : 'inc';
+    if (cur !== 'TWD') small = '≈ ' + twd(c.tw[t.id]?.amt || 0);
+    if (!forAcct && a) sub.push(a.name);
+  }
+  if (t.note) sub.unshift(t.note);
+  if (t.projectId && S.data.projects[t.projectId]) sub.push('#' + S.data.projects[t.projectId].name);
+  if (t.inst && t.inst.n > 1) sub.push(`分期 ${t.inst.n} 期`);
+  if (t.rule) sub.push('固定');
+  if ((forAcct && !noDate) || withDate) sub.unshift(withDate ? t.date.replace(/-/g, '/') : md(t.date));
+  return `<button class="row" onclick="openAdd('${t.id}')"><span class="cic" style="background:${color}">${ic(icon,20)}</span>
+    <span class="mid"><b>${esc(title)}</b>${sub.length ? `<small>${esc(sub.join(' · '))}</small>` : ''}</span>
+    <span class="amt ${cls}">${amt}${small ? `<small>${small}</small>` : ''}</span></button>`;
+}
+function alerts(){
+  const out = [], dl = dueList();
+  if (dl.length) out.push(`<button class="alert" style="width:calc(100% - 32px);text-align:left" onclick="openDue()">${ic('repeat',18)}<span style="flex:1">固定收支 <b>${dl.length} 筆</b>待確認</span>${ic('right',16)}</button>`);
+  const n = new Date(), b = budgetOf(n.getFullYear(), n.getMonth());
+  if (b) {
+    const over = Object.entries(b.cats).filter(([, v]) => v.pct >= 1).map(([id]) => S.data.categories[id]?.name).filter(Boolean);
+    if (b.total && b.total.pct >= 1) out.push(`<button class="alert warn" style="width:calc(100% - 32px);text-align:left" onclick="S.ui.rp.seg='budget';go('reports')">${ic('target',18)}<span>本月總預算已超支 ${twd(-b.total.remain)}</span></button>`);
+    else if (b.total && b.total.pct >= .85) out.push(`<button class="alert" style="width:calc(100% - 32px);text-align:left" onclick="S.ui.rp.seg='budget';go('reports')">${ic('target',18)}<span>本月預算已用 ${Math.round(b.total.pct * 100)}%，剩 ${twd(b.total.remain)}</span></button>`);
+    if (over.length) out.push(`<button class="alert warn" style="width:calc(100% - 32px);text-align:left" onclick="S.ui.rp.seg='budget';go('reports')">${ic('target',18)}<span>超支分類：${esc(over.slice(0, 3).join('、'))}${over.length > 3 ? ` 等 ${over.length} 個` : ''}</span></button>`);
+  }
+  const bk = backupAlert(); if (bk) out.push(bk);
+  if (S.mode === 'local' && /^https?:/.test(location.protocol) && !/localhost|127\.0\.0\.1/.test(location.hostname)) out.unshift(`<div class="alert warn">${ic('bell',18)}<span>尚未設定雲端（config.js），資料只存在這台裝置</span></div>`);
+  for (const a of accList()) {
+    const ci = cardInfo(a); if (!ci || ci.remain <= 0) continue;
+    if (ci.left < 0) out.push(`<div class="alert warn">${ic('bell',18)}<span><b>${esc(a.name)}</b> 已逾期 ${-ci.left} 天，未繳 ${fmt(ci.remain, a.currency)}</span></div>`);
+    else if (ci.left <= 7) out.push(`<div class="alert">${ic('bell',18)}<span><b>${esc(a.name)}</b> ${ci.left === 0 ? '今天' : ci.left + ' 天後'}截止（${md(ci.due)}），未繳 ${fmt(ci.remain, a.currency)}</span></div>`);
+  }
+  return out.join('');
+}
+function viewHome(){
+  const sel = S.ui.sel, d = pd(sel), ws = wkStart(sel), c = compute(), td = today();
+  const y = d.getFullYear(), m = d.getMonth();
+  const mFrom = ds(new Date(y, m, 1)), mTo = ds(new Date(y, m, dim(y, m)));
+  const ms = summary(mFrom, mTo), bud = budgetOf(y, m);
+  const dsum = summary(sel, sel), wsum = summary(ws, addD(ws, 6)), ysum = summary(`${y}-01-01`, `${y}-12-31`);
+  let days = '';
+  for (let i = 0; i < 7; i++) {
+    const x = addD(ws, i), xd = pd(x);
+    days += `<button class="day ${x === sel ? 'sel' : ''} ${x === td ? 'today' : ''} ${c.days.has(x) ? 'has' : ''}" onclick="selDay('${x}')"><small>${WD[xd.getDay()]}</small><b>${xd.getDate()}</b><i></i></button>`;
+  }
+  const list = c.list.filter(t => t.date === sel).reverse();
+  const perCell = (label, s, fn) => `<div class="tap" onclick="${fn}"><small>${label} ›</small><p><span class="exp">${twd(-s.exp)}</span><br><span class="inc">${twd(s.inc, true)}</span></p></div>`;
+  return `<div class="top"><div><div class="brand">MONEY</div><h1>${y} 年 ${m+1} 月</h1></div>
+    <div style="display:flex;gap:4px">${sel !== td ? `<button class="ib" onclick="selDay('${td}')" style="font-size:13px;width:auto;padding:0 10px;color:var(--acc)">今天</button>` : ''}
+    <button class="ib" onclick="openSearch()">${ic('search',22)}</button><button class="ib" onclick="go('carrier')">${ic('barcode',22)}</button><button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
+    ${alerts()}
+    <div class="week" id="week"><button class="arr" onclick="selDay('${addD(sel,-7)}')">${ic('left',20)}</button><div class="days">${days}</div><button class="arr" onclick="selDay('${addD(sel,7)}')">${ic('right',20)}</button></div>
+    <div class="card"><div class="sum3">
+      <div class="tap" onclick="goRp('cat','month',${y},${m},'income')"><small>本月收入 ›</small><b class="inc">${twd(ms.inc)}</b></div>
+      <div class="tap" onclick="goRp('cat','month',${y},${m},'expense')"><small>本月支出 ›</small><b class="exp">${twd(ms.exp)}</b></div>
+      <div class="tap" onclick="goRp('trend','month',${y},${m})"><small>本月結餘 ›</small><b class="${ms.inc - ms.exp < 0 ? 'exp' : ''}">${twd(ms.inc - ms.exp)}</b></div></div>
+      ${bud && bud.total ? (() => { const T = bud.total, now = new Date(), cur = y === now.getFullYear() && m === now.getMonth(), left = dim(y, m) - now.getDate() + 1;
+        return `<div class="tap" style="margin-top:12px;padding:8px 2px 2px;border-top:1px solid var(--line)" onclick="goRp('budget','month',${y},${m})">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px"><span><span class="tx2">本月可用 ›</span> <b style="font-size:16px" class="${T.remain < 0 ? 'exp' : ''}">${twd(T.remain)}</b></span>
+          <span class="tx2">${cur && T.remain > 0 ? `每天可花 ${twd(T.remain / left)}` : `預算 ${twd(T.avail)}`}</span></div>${bbar(T.pct)}</div>`; })() : ''}</div>
+    <div class="per">${perCell('本週', wsum, `openRange('${ws}','${addD(ws, 6)}')`)}${perCell(`${m+1}月`, ms, `goRp('trend','month',${y},${m})`)}${perCell(`${y}年`, ysum, `goRp('trend','year',${y},${m})`)}</div>
+    <div class="sec"><h3>${md(sel)} ${wdName(sel)}${sel === td ? '・今天' : ''}</h3><span class="sm"><span class="exp">${twd(-dsum.exp)}</span>　<span class="inc">${twd(dsum.inc, true)}</span></span></div>
+    <div class="list">${list.length ? list.map(t => txnRow(t)).join('') : `<div class="empty">這天還沒有紀錄<br><button style="color:var(--acc);margin-top:8px;font-weight:600" onclick="openAdd()">＋ 記一筆</button></div>`}</div>`;
+}
+function goRp(seg, per, y, m, type){ const r = S.ui.rp; S.ui.rp = {...r, seg, per:per || r.per, y:y ?? r.y, m:m ?? r.m, type:type || r.type}; go('reports'); }
+function openRange(from, to){ SR = {q:'', type:'', acc:'', cat:'', proj:'', from, to, min:'', max:'', limit:100, more:true}; openSearch(); }
+function selDay(x){ S.ui.sel = x; render(); }
+function pickMonth(v){ if (!v) return; const [y, m] = v.split('-').map(Number); const cur = pd(S.ui.sel); S.ui.sel = ds(new Date(y, m-1, Math.min(cur.getDate(), dim(y, m-1)))); render(); }
+
+let MC = {y:0, m:0};
+function openMonthCal(){ const d = pd(S.ui.sel); MC = {y:d.getFullYear(), m:d.getMonth()}; openLayer('mcal', renderMonthCal, 'btm'); }
+function mcShift(n){ MC.m += n; if (MC.m < 0) { MC.m = 11; MC.y--; } if (MC.m > 11) { MC.m = 0; MC.y++; } redraw('mcal'); }
+function renderMonthCal(){
+  const {y, m} = MC, c = compute(), td = today(), first = new Date(y, m, 1), lead = (first.getDay() + 6) % 7, n = dim(y, m);
+  const daily = {};
+  for (const f of flowsIn(`${y}-${pad(m+1)}-01`, `${y}-${pad(m+1)}-31`)) if (f.type === 'expense') daily[f.date] = (daily[f.date] || 0) + f.amt;
+  let cells = ['一','二','三','四','五','六','日'].map(w => `<div class="wh">${w}</div>`).join('');
+  for (let i = 0; i < lead; i++) cells += '<span class="out"></span>';
+  for (let d = 1; d <= n; d++) {
+    const x = ds(new Date(y, m, d)), e = daily[x];
+    cells += `<button class="${x === S.ui.sel ? 'sel' : ''} ${x === td ? 'today' : ''} ${c.days.has(x) ? 'has' : ''}" onclick="closeLayer('mcal');selDay('${x}')"><b>${d}</b><i></i>${e ? `<small>${nf(Math.round(e), 0)}</small>` : ''}</button>`;
+  }
+  const s = summary(ds(first), ds(new Date(y, m, n)));
+  return sheet('mcal', `<span style="display:flex;align-items:center;gap:4px"><button class="mini" onclick="mcShift(-1)">${ic('left',20)}</button>${y} 年 ${m+1} 月<button class="mini" onclick="mcShift(1)">${ic('right',20)}</button></span>`,
+    `<div class="mcal">${cells}</div><div class="kv" style="margin-top:12px;grid-template-columns:1fr 1fr 1fr"><div><small>收入</small><b class="inc">${twd(s.inc)}</b></div><div><small>支出</small><b class="exp">${twd(s.exp)}</b></div><div><small>結餘</small><b>${twd(s.inc - s.exp)}</b></div></div>
+    <button class="btn sec2" style="margin-top:14px" onclick="closeLayer('mcal');selDay(today())">回到今天</button>`);
+}
+function mountSwipe(){
+  const w = $('#week'); if (!w) return; let x0 = null;
+  w.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, {passive:true});
+  w.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 50) selDay(addD(S.ui.sel, dx < 0 ? 7 : -7)); x0 = null; });
+}
+
+/* ---------- accounts ---------- */
+const TYPES = {cash:['現金','cash'], bank:['銀行','bank'], credit:['信用卡','card'], epay:['電子支付／票證','wallet'], other:['其他','more']};
+function acctRow(a){
+  const c = compute(), b = c.bal[a.id] || 0, ci = cardInfo(a); let sub = '';
+  if (ci) sub = ci.over ? `溢繳 ${fmt(ci.over, a.currency)}` : ci.remain > 0 ? `本期未繳 ${fmt(ci.remain, a.currency)} · ${md(ci.due)} 截止` : '本期已繳清';
+  else if (a.currency !== 'TWD') sub = `≈ ${twd(b * rate(a.currency))} · 匯率 ${(+rate(a.currency)).toFixed(4)}`;
+  else if (a.type === 'credit') sub = '未設定結帳日';
+  if (a.inNW === false) sub = '不列入總資產' + (sub ? ' · ' + sub : '');
+  return `<div class="row" data-id="${a.id}" onclick="openAcct('${a.id}')" style="cursor:pointer"><span class="grip">${ic('grip',20)}</span><span class="cic" style="background:${a.color || '#4F6D7A'}">${ic(TYPES[a.type]?.[1] || 'more',20)}</span>
+    <span class="mid"><b>${esc(a.name)}</b>${sub ? `<small>${sub}</small>` : ''}</span><span class="amt ${b < 0 ? 'exp' : ''}">${fmt(b, a.currency)}</span></div>`;
+}
+function viewAccounts(){
+  const nw = netWorth(), c = compute(), all = accList(true), act = all.filter(a => !a.archived), arch = all.filter(a => a.archived);
+  let groups = '';
+  for (const [k, [label]] of Object.entries(TYPES)) {
+    const g = act.filter(a => a.type === k); if (!g.length) continue;
+    const tot = g.filter(a => a.inNW !== false).reduce((s, a) => s + (c.bal[a.id] || 0) * rate(a.currency), 0);
+    groups += `<div class="grp"><span>${label}</span><span class="${tot < 0 ? 'exp' : ''}">${twd(tot)}</span></div><div class="list sl" data-type="${k}">${g.map(acctRow).join('')}</div>`;
+  }
+  return `<div class="top"><h1>帳戶</h1><div style="display:flex;gap:4px">
+      <button class="ib ${S.ui.sorting ? 'on' : ''}" onclick="S.ui.sorting=!S.ui.sorting;render()">${ic('sort',22)}</button>
+      <button class="ib" onclick="openAcctForm()">${ic('plus',24)}</button></div></div>
+    <div class="card tap" onclick="goRp('asset','month')"><div class="nw"><div><small class="tx2">淨資產 ›</small><div class="big ${nw.net < 0 ? 'exp' : ''}">${twd(nw.net)}</div></div>
+      <div class="r"><span class="tx2">資產</span> <b class="inc">${twd(nw.as)}</b><br><span class="tx2">負債</span> <b class="exp">${twd(nw.li)}</b></div></div></div>
+    ${S.ui.sorting ? '<div class="hint">按住左側 ⋮⋮ 拖曳排序，完成後再按一次排序鈕</div>' : ''}
+    <div class="${S.ui.sorting ? 'sorting' : ''}">${groups || '<div class="empty">還沒有帳戶，按右上角＋新增</div>'}</div>
+    ${arch.length ? `<div class="grp" onclick="S.ui.showArch=!S.ui.showArch;render()" style="cursor:pointer"><span>已封存（${arch.length}）</span><span>${ic(S.ui.showArch ? 'down' : 'right',16)}</span></div>${S.ui.showArch ? `<div class="list">${arch.map(acctRow).join('')}</div>` : ''}` : ''}`;
+}
+function mountSort(){
+  if (typeof Sortable === 'undefined') return;
+  document.querySelectorAll('.sl').forEach(el => Sortable.create(el, {handle:'.grip', animation:150, ghostClass:'ghost-sortable', onEnd(){
+    [...el.children].forEach((row, i) => { const a = S.data.accounts[row.dataset.id]; if (a && a.order !== i) { a.order = i; put('accounts', a, true); } });
+  }}));
+}
+function openAcct(id){ if (S.ui.sorting) return; const n = new Date(); S.ui.am = {y:n.getFullYear(), m:n.getMonth()}; S.ui.acct = id; S.ui.tab = 'acct'; render(); scrollTo(0, 0); }
+function viewAcct(){
+  const a = S.data.accounts[S.ui.acct]; if (!a) { S.ui.tab = 'accounts'; return viewAccounts(); }
+  const c = compute(), b = c.bal[a.id] || 0, ci = cardInfo(a);
+  if (!S.ui.am) { const n = new Date(); S.ui.am = {y:n.getFullYear(), m:n.getMonth()}; }
+  const {y:ay, m:amn} = S.ui.am, mf = ds(new Date(ay, amn, 1)), mt = ds(new Date(ay, amn, dim(ay, amn)));
+  const list = c.list.filter(t => (t.accountId === a.id || t.toAccountId === a.id) && t.date >= mf && t.date <= mt).reverse();
+  let mIn = 0, mOut = 0, endBal = +a.init || 0;
+  for (const t of c.list) { if (t.date > mt) break; const d = delta(t, a.id); endBal += d; if (t.date >= mf && d) { if (d > 0) mIn += d; else mOut -= d; } }
+  const now = new Date(), isCurM = ay === now.getFullYear() && amn === now.getMonth();
+  let info = '';
+  if (ci) info = `<div class="card"><div class="kv">
+      <div><small>本期應繳（${md(ci.close)} 結帳）</small><b>${fmt(ci.owed, a.currency)}</b></div>
+      <div><small>已繳</small><b class="inc">${fmt(ci.paid, a.currency)}</b></div>
+      <div><small>剩餘未繳</small><b class="${ci.remain ? 'exp' : ''}">${fmt(ci.remain, a.currency)}</b></div>
+      <div><small>繳款截止</small><b>${md(ci.due)}（${ci.left >= 0 ? ci.left + ' 天' : '逾期'}）</b></div>
+      ${a.limit ? `<div><small>額度</small><b>${fmt(a.limit, a.currency)}</b></div><div><small>可用額度</small><b>${fmt(Math.max(0, a.limit + Math.min(0, b)), a.currency)}</b></div>` : ''}
+      ${ci.unbilled ? `<div><small>分期未入帳</small><b>${fmt(ci.unbilled, a.currency)}</b></div>` : ''}
+      ${ci.over ? `<div><small>溢繳</small><b class="inc">${fmt(ci.over, a.currency)}</b></div>` : ''}
+    </div><div class="hint" style="margin:10px 0 0">繳卡費：記一筆「轉帳」，從銀行帳戶轉入這張卡</div></div>`;
+  else if (a.currency !== 'TWD') {
+    const cr = rate(a.currency), av = c.avg[a.id], gain = b * (cr - av);
+    info = `<div class="card"><div class="kv">
+      <div><small>現在匯率</small><b>${cr.toFixed(4)}</b></div><div><small>平均成本匯率</small><b>${av.toFixed(4)}</b></div>
+      <div><small>現值</small><b>${twd(b * cr)}</b></div><div><small>匯差</small><b class="${gain < 0 ? 'exp' : 'inc'}">${twd(gain, true)}</b></div></div></div>`;
+  }
+  return `<div class="top"><button class="ib" onclick="go('accounts')">${ic('left',24)}</button><h1 style="flex:1;font-size:19px">${esc(a.name)}</h1>
+      <button class="ib" onclick="openAcctForm('${a.id}')">${ic('edit',22)}</button></div>
+    <div class="card"><small class="tx2">${TYPES[a.type]?.[0] || ''} · ${a.currency}${a.archived ? ' · 已封存' : ''}</small>
+      <div style="font-size:30px;font-weight:800;margin-top:4px" class="${b < 0 ? 'exp' : ''}">${fmt(b, a.currency)}</div>
+      ${a.currency !== 'TWD' ? `<small class="tx2">≈ ${twd(b * rate(a.currency))}</small>` : ''}</div>
+    ${info}
+    <div class="rbar" style="margin-top:14px"><h3 style="margin:0 4px;font-size:15px">明細</h3><div class="nav2"><button onclick="amShift(-1)">${ic('left',20)}</button><span>${ay} 年 ${amn + 1} 月</span><button onclick="amShift(1)">${ic('right',20)}</button></div></div>
+    <div class="card" style="padding:12px 16px"><div class="sum3">
+      <div><small>流入</small><b class="inc" style="font-size:16px">${fmt(mIn, a.currency)}</b></div>
+      <div><small>流出</small><b class="exp" style="font-size:16px">${fmt(mOut, a.currency)}</b></div>
+      <div><small>${isCurM ? '目前餘額' : '月底餘額'}</small><b style="font-size:16px" class="${endBal < 0 ? 'exp' : ''}">${fmt(endBal, a.currency)}</b></div></div>
+      <div class="sm tx2" style="margin-top:6px">${list.length} 筆${isCurM ? '' : ` · <button style="color:var(--acc)" onclick="const n=new Date();S.ui.am={y:n.getFullYear(),m:n.getMonth()};render()">回本月</button>`}</div></div>
+    ${list.length ? Object.entries(list.reduce((g, t) => ((g[t.date] = g[t.date] || []).push(t), g), {})).map(([d, ts]) => { const net = ts.reduce((x, t) => x + delta(t, a.id), 0);
+      return `<div class="sec" style="margin:12px 20px 4px"><span class="sm b">${md(d)} ${wdName(d)}</span><span class="sm ${net < 0 ? 'exp' : 'inc'}">${fmt(net, a.currency, true)}</span></div><div class="list">${ts.map(t => txnRow(t, a.id, false, true)).join('')}</div>`; }).join('')
+      : '<div class="list"><div class="empty">這個月沒有紀錄</div></div>'}<div style="height:20px"></div>`;
+}
+
+/* account form */
+let AF = null;
+function amShift(n){ let {y, m} = S.ui.am; m += n; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } S.ui.am = {y, m}; render(); }
+function openAcctForm(id){
+  const a = id ? S.data.accounts[id] : null;
+  AF = a ? {...a, inNW: a.inNW !== false, initInput: a.type === 'credit' ? String(-(a.init || 0)) : String(a.init || 0)} :
+    {id:null, name:'', type:'bank', currency:'TWD', initInput:'0', initRate:'', limit:'', closeDay:'', dueDay:'', color:PALETTE[12], archived:false, inNW:true};
+  openLayer('acf', renderAcctForm, 'btm');
+}
+function renderAcctForm(){
+  const f = AF, cr = f.type === 'credit';
+  const body = `
+    <div class="fld"><label>名稱</label><input value="${esc(f.name)}" oninput="AF.name=this.value" placeholder="例：台新、日幣現金"></div>
+    <div class="two"><div class="fld"><label>類型</label><select onchange="AF.type=this.value;redraw('acf')">${Object.entries(TYPES).map(([k,[l]]) => `<option value="${k}" ${f.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div class="fld"><label>幣別</label><select onchange="AF.currency=this.value;redraw('acf')">${Object.entries(CUR).filter(([k,v]) => !v.hide || f.currency === k).map(([k,v]) => `<option value="${k}" ${f.currency === k ? 'selected' : ''}>${k} ${v.name}</option>`).join('')}</select></div></div>
+    <div class="two"><div class="fld"><label>${cr ? '初始欠款' : '初始餘額'}（${f.currency}）</label><input inputmode="decimal" value="${esc(f.initInput)}" oninput="AF.initInput=this.value"></div>
+    ${f.currency !== 'TWD' ? `<div class="fld"><label>初始成本匯率（1 ${f.currency} = ? TWD）</label><input inputmode="decimal" value="${esc(f.initRate)}" placeholder="${rate(f.currency).toFixed(4)}" oninput="AF.initRate=this.value"></div>` : '<div></div>'}</div>
+    ${f.id ? `<div class="fld"><label>校正${cr ? '目前欠款' : '目前餘額'}（填實際數字，自動回推初始值；不改請留空）</label><input inputmode="decimal" value="${esc(f.calib || '')}" placeholder="目前 ${cr ? fmt(Math.max(0, -(compute().bal[f.id] || 0)), f.currency) : fmt(compute().bal[f.id] || 0, f.currency)}" oninput="AF.calib=this.value"></div>` : ''}
+    ${cr ? `<div class="two"><div class="fld"><label>結帳日（每月幾號）</label><input inputmode="numeric" value="${esc(f.closeDay)}" oninput="AF.closeDay=this.value" placeholder="例：5"></div>
+      <div class="fld"><label>繳款截止日</label><input inputmode="numeric" value="${esc(f.dueDay)}" oninput="AF.dueDay=this.value" placeholder="例：20"></div></div>
+      <div class="fld"><label>信用額度（可空白）</label><input inputmode="decimal" value="${esc(f.limit)}" oninput="AF.limit=this.value"></div>` : ''}
+    <div class="fld"><label>顏色</label><div class="sw">${PALETTE.map(p => `<button style="background:${p}" class="${f.color === p ? 'on' : ''}" onclick="AF.color='${p}';redraw('acf')"></button>`).join('')}</div></div>
+    <div class="tog"><span>列入總資產<br><small class="tx2">關閉後不計入淨資產、資產報表，收支照常統計</small></span><input type="checkbox" ${f.inNW !== false ? 'checked' : ''} onchange="AF.inNW=this.checked"></div>
+    ${f.id ? `<div class="tog"><span>封存（隱藏但保留紀錄）</span><input type="checkbox" ${f.archived ? 'checked' : ''} onchange="AF.archived=this.checked"></div>` : ''}
+    <button class="btn" onclick="saveAcct()" style="margin-top:8px">儲存</button>
+    ${f.id ? `<button class="btn del" onclick="delAcct()" style="margin-top:6px">刪除帳戶</button>` : ''}`;
+  return sheet('acf', f.id ? '編輯帳戶' : '新增帳戶', body);
+}
+function saveAcct(){
+  const f = AF; if (!f.name.trim()) return toast('請輸入名稱');
+  const init = parseFloat(f.initInput) || 0, cr = f.type === 'credit';
+  const cd = parseInt(f.closeDay), dd = parseInt(f.dueDay);
+  if (cr && (f.closeDay || f.dueDay) && !(cd >= 1 && cd <= 31 && dd >= 1 && dd <= 31)) return toast('結帳日／截止日要是 1–31');
+  const a = {
+    id:f.id || 'a_' + uid(), name:f.name.trim(), type:f.type, currency:f.currency,
+    init:cr ? -Math.abs(init) : init, initRate:f.currency !== 'TWD' && f.initRate ? parseFloat(f.initRate) : null,
+    limit:cr && f.limit ? parseFloat(f.limit) : null, closeDay:cr && cd ? cd : null, dueDay:cr && dd ? dd : null,
+    color:f.color, archived:!!f.archived, inNW:f.inNW !== false, order:f.id ? (f.order ?? 0) : accList(true).length
+  };
+  if (f.id && f.calib !== undefined && f.calib !== '' && !isNaN(parseFloat(f.calib))) {
+    const v = parseFloat(f.calib), target = cr ? -Math.abs(v) : v, curBal = compute().bal[f.id] || 0;
+    a.init = (+S.data.accounts[f.id].init || 0) + (target - curBal);
+  }
+  put('accounts', a); closeLayer('acf'); toast('已儲存');
+}
+function delAcct(){
+  const id = AF.id;
+  if (Object.values(S.data.txns).some(t => t.accountId === id || t.toAccountId === id)) return toast('有紀錄的帳戶不能刪除，請改用封存');
+  if (!confirm('確定刪除？')) return;
+  closeLayer('acf'); S.ui.tab = 'accounts'; del('accounts', id);
+}
+
+/* ---------- add / edit txn ---------- */
+let F = null;
+const OPS = /[+\-×÷]/;
+function evalExpr(s){
+  if (!s) return 0;
+  s = s.replace(/[+\-×÷.]+$/, '');
+  const tk = s.match(/\d+\.?\d*|\.\d+|[+\-×÷]/g); if (!tk) return 0;
+  const nums = [], ops = [];
+  for (const x of tk) { if (OPS.test(x) && x.length === 1) ops.push(x); else nums.push(parseFloat(x)); }
+  const n2 = [nums[0]], o2 = [];
+  for (let i = 0; i < ops.length; i++) {
+    const b = nums[i+1]; if (b === undefined) break;
+    if (ops[i] === '×') n2[n2.length-1] *= b;
+    else if (ops[i] === '÷') n2[n2.length-1] = b ? n2[n2.length-1] / b : 0;
+    else { o2.push(ops[i]); n2.push(b); }
+  }
+  let v = n2[0]; o2.forEach((o, i) => { v = o === '+' ? v + n2[i+1] : v - n2[i+1]; });
+  return Math.round(v * 100) / 100;
+}
+function rawFmt(s){ if (!s) return '0'; if (OPS.test(s)) return nf(evalExpr(s), 2); const [i, d] = s.split('.'); return Number(i || 0).toLocaleString('en-US') + (d !== undefined ? '.' + d : ''); }
+const exLine = s => s && OPS.test(s) ? `<div class="ex">${esc(s)}</div>` : '';
+const exprOf = n => n ? String(n) : '';
+function defaultCat(type){
+  const last = P.lastCat[type]; if (last && S.data.categories[last] && !S.data.categories[last].hidden) return last;
+  const mains = Object.values(S.data.categories).filter(c => c.type === type && !c.parent && !c.hidden).sort(byOrder);
+  if (!mains.length) return null;
+  const subs = Object.values(S.data.categories).filter(c => c.parent === mains[0].id && !c.hidden).sort(byOrder);
+  return (subs[0] || mains[0]).id;
+}
+function suggestCat(){
+  const h = new Date().getHours(), C = S.data.categories, ok = id => C[id] && !C[id].hidden && C[id].type === 'expense';
+  const cnt = {}, since = Date.now() - 180 * 864e5;
+  for (const t of Object.values(S.data.txns)) {
+    if (t.type !== 'expense' || t.src || !t.createdAt || t.createdAt < since) continue;
+    const d = new Date(t.createdAt); if (ds(d) !== t.date) continue;
+    const dh = Math.abs(d.getHours() - h); if (Math.min(dh, 24 - dh) > 1) continue;
+    cnt[t.catId] = (cnt[t.catId] || 0) + 1;
+  }
+  const best = Object.entries(cnt).filter(([id]) => ok(id)).sort((a, b) => b[1] - a[1])[0];
+  if (best && best[1] >= 3) return best[0];
+  const name = h >= 5 && h < 10 ? '早餐' : h >= 10 && h < 14 ? '午餐' : h >= 17 && h < 21 ? '晚餐' : (h >= 21 || h < 2) ? '宵夜' : null;
+  if (name) { const c = Object.values(C).find(c => ok(c.id) && c.parent && c.name === name); if (c) return c.id; }
+  return null;
+}
+let NS = {ver:-1, map:{}};
+function noteSuggest(catId){
+  if (NS.ver !== VER) {
+    const map = {}, since = ds(new Date(Date.now() - 365 * 864e5));
+    for (const t of Object.values(S.data.txns)) {
+      const n = (t.note || '').trim(); if (!n || n.length > 16 || n.includes('\n') || t.date < since) continue;
+      const m = map[t.catId] || (map[t.catId] = {}); m[n] = (m[n] || 0) + 1;
+    }
+    NS = {ver:VER, map};
+  }
+  return Object.entries(NS.map[catId] || {}).filter(([, c]) => c >= 2).sort((a, b) => b[1] - a[1]).slice(0, 6).map(x => x[0]);
+}
+function defaultAcc(){ const l = P.lastAcc; if (l && S.data.accounts[l] && !S.data.accounts[l].archived) return l; return accList()[0]?.id || null; }
+function blankF(){
+  const accs = accList(), from = defaultAcc();
+  return {id:null, mode:'txn', type:'expense', catId:suggestCat() || defaultCat('expense'), amtExpr:'', toExpr:'', feeExpr:'', instN:0, instFeeExpr:'', repeat:'', until:'', active:'amt',
+    date:S.ui.tab === 'home' ? S.ui.sel : today(), accountId:from, toAccountId:(accs.find(a => a.id !== from) || accs[0]).id, projectId:'', note:''};
+}
+function fFromObj(o){
+  return {type:o.type, catId:o.catId, amtExpr:exprOf(o.amount), toExpr:exprOf(o.toAmount), feeExpr:exprOf(o.fee), instN:o.inst?.n || 0, instFeeExpr:exprOf(o.inst?.fee),
+    accountId:o.accountId, toAccountId:o.toAccountId || (accList().find(a => a.id !== o.accountId) || {}).id, projectId:o.projectId || '', note:o.note || ''};
+}
+function openAdd(id, preset){
+  if (!accList().length) { toast('請先新增帳戶'); return go('accounts'); }
+  const t = id ? S.data.txns[id] : null;
+  if (t) F = {...blankF(), ...fFromObj(t), id:t.id, date:t.date, createdAt:t.createdAt};
+  else F = {...blankF(), ...(preset || {})};
+  F.active = 'amt';
+  openLayer('add', renderAdd, 'full');
+}
+function openRule(rid){
+  if (!accList().length) { toast('請先新增帳戶'); return go('accounts'); }
+  const r = rid ? S.data.recurring[rid] : null;
+  F = r ? {...blankF(), ...fFromObj(r), mode:'rule', ruleId:r.id, date:r.start, repeat:r.freq, until:r.until || '', ruleActive:r.active !== false}
+        : {...blankF(), mode:'rule', ruleId:null, date:today(), repeat:'month', ruleActive:true};
+  openLayer('add', renderAdd, 'full');
+}
+function setType(tp){
+  if (F.type === tp) return; F.type = tp; F.active = 'amt';
+  if (tp !== 'transfer') { const c = S.data.categories[F.catId]; if (!c || c.type !== tp) F.catId = tp === 'expense' ? (suggestCat() || defaultCat(tp)) : defaultCat(tp); }
+  redraw('add');
+}
+function accOpts(sel){ const c = compute(); return accList().map(a => `<option value="${a.id}" ${a.id === sel ? 'selected' : ''}>${esc(a.name)}（${fmt(c.bal[a.id] || 0, a.currency)}）</option>`).join(''); }
+function projOpts(){
+  const ps = Object.values(S.data.projects).filter(p => !p.hidden && (!p.archived || p.id === F.projectId)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  return `<option value="">無專案</option>${ps.map(p => `<option value="${p.id}" ${p.id === F.projectId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="__new">＋ 新增專案</option>`;
+}
+const FREQ = {week:'每週', month:'每月', year:'每年'};
+const INST_OPTS = [3, 6, 9, 10, 12, 18, 24, 30, 36];
+function tplList(){ return Object.values(S.data.templates || {}).sort(byOrder); }
+function renderAdd(){
+  const t = F.type, A = S.data.accounts, c = compute(), rule = F.mode === 'rule', isNew = !F.id && !rule;
+  const a = A[F.accountId], cur = a ? a.currency : 'TWD';
+  let top = '', fields = '';
+  if (t !== 'transfer') {
+    const cat = S.data.categories[F.catId], m = catMain(cat);
+    top = `<div class="ftop"><button class="catbtn" onclick="openCatPicker()"><span class="cic" style="background:${m ? m.color : '#aaa'}">${ic(m ? m.icon : 'more',22)}</span>
+      <span class="cn"><small>${esc(m && m !== cat ? m.name : (cat ? '' : ' '))}</small><b>${esc(cat ? cat.name : '選擇分類')}</b></span><span class="tx2">${ic('down',16)}</span></button>
+      <div class="amtbox ${t}">${exLine(F.amtExpr)}<div class="big">${CUR[cur].sym}${rawFmt(F.amtExpr)}</div></div></div>`;
+    fields = `<div class="frow"><span class="lb">帳戶</span><span class="vl"><b>${esc(a ? a.name : '選擇帳戶')}</b><span class="tx2 sm">餘額 ${a ? fmt(c.bal[a.id] || 0, cur) : ''}</span></span>${ic('down',16)}
+      <select class="ov" onchange="setF('accountId',this.value)">${accOpts(F.accountId)}</select></div>`;
+    if (t === 'expense' && a && a.type === 'credit' && !rule) {
+      const n = +F.instN || 0, opts = [...new Set([...INST_OPTS, ...(n > 1 ? [n] : [])])].sort((x, y) => x - y);
+      const amt = evalExpr(F.amtExpr), fee = evalExpr(F.instFeeExpr);
+      fields += `<div class="frow"><span class="lb">分期</span><span class="vl"><b class="${n > 1 ? '' : 'tx2'}">${n > 1 ? n + ' 期' : '不分期'}</b>${n > 1 && amt ? `<span class="tx2 sm">每期約 ${fmt((amt + fee) / n, cur)}</span>` : ''}</span>${ic('down',16)}
+        <select class="ov" onchange="setInst(this.value)"><option value="0">不分期</option>${opts.map(o => `<option value="${o}" ${o === n ? 'selected' : ''}>${o} 期</option>`).join('')}<option value="custom">自訂期數…</option></select></div>
+        ${n > 1 ? `<div class="frow ${F.active === 'ifee' ? 'on' : ''}" onclick="setAct('ifee')"><span class="lb" style="width:auto">手續費／利息</span><span class="vl" style="justify-content:flex-end"><b class="${F.instFeeExpr ? 'exp' : 'tx2'}">${F.instFeeExpr ? CUR[cur].sym + rawFmt(F.instFeeExpr) : '總額，點此輸入'}</b></span></div>` : ''}`;
+    }
+  } else {
+    const b = A[F.toAccountId], bcur = b ? b.currency : 'TWD', diff = cur !== bcur;
+    top = `<div class="trw"><div class="chip"><span class="cic" style="background:${a?.color || '#888'};width:32px;height:32px;border-radius:10px">${ic(TYPES[a?.type]?.[1] || 'more',18)}</span><span class="n">${esc(a ? a.name : '轉出')}</span><select class="ov" onchange="setF('accountId',this.value)">${accOpts(F.accountId)}</select></div>
+      <button class="swap" onclick="swapAcc()">${ic('swap',20)}</button>
+      <div class="chip"><span class="cic" style="background:${b?.color || '#888'};width:32px;height:32px;border-radius:10px">${ic(TYPES[b?.type]?.[1] || 'more',18)}</span><span class="n">${esc(b ? b.name : '轉入')}</span><select class="ov" onchange="setF('toAccountId',this.value)">${accOpts(F.toAccountId)}</select></div></div>
+      <div class="tamts" ${diff ? '' : 'style="grid-template-columns:1fr"'}>
+        <button class="tbox ${F.active === 'amt' ? 'on' : ''}" onclick="setAct('amt')"><small>轉出金額 · ${cur}</small>${exLine(F.amtExpr)}<b>${CUR[cur].sym}${rawFmt(F.amtExpr)}</b></button>
+        ${diff ? `<button class="tbox ${F.active === 'to' ? 'on' : ''}" onclick="setAct('to')"><small>轉入金額 · ${bcur}</small>${exLine(F.toExpr)}<b>${CUR[bcur].sym}${rawFmt(F.toExpr)}</b>
+          ${evalExpr(F.amtExpr) && evalExpr(F.toExpr) ? `<span class="ex">匯率 1 ${bcur} = ${(evalExpr(F.amtExpr) * (cur === 'TWD' ? 1 : c.avg[F.accountId]) / evalExpr(F.toExpr)).toFixed(4)} TWD</span>` : ''}</button>` : ''}
+      </div>`;
+    fields = `<div class="frow ${F.active === 'fee' ? 'on' : ''}" onclick="setAct('fee')"><span class="lb">手續費</span><span class="vl"><b class="${F.feeExpr ? 'exp' : 'tx2'}">${F.feeExpr ? CUR[cur].sym + rawFmt(F.feeExpr) : '點此輸入（從轉出帳戶扣）'}</b></span></div>`;
+  }
+  const pj = S.data.projects[F.projectId], tpls = isNew ? tplList() : [];
+  const showRepeat = rule || isNew;
+  const repeatRow = showRepeat ? `<div class="frow"><span class="lb">重複</span><span class="vl"><b class="${F.repeat ? '' : 'tx2'}">${F.repeat ? FREQ[F.repeat] : '不重複'}</b>${F.repeat ? `<span class="tx2 sm">${repeatHint(F.date, F.repeat)}</span>` : ''}</span>${ic('down',16)}
+      <select class="ov" onchange="F.repeat=this.value;redraw('add')">${rule ? '' : '<option value="">不重複</option>'}${Object.entries(FREQ).map(([k, l]) => `<option value="${k}" ${F.repeat === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    ${F.repeat ? `<div class="frow"><span class="lb">結束</span><span class="vl"><b class="${F.until ? '' : 'tx2'}">${F.until ? longDate(F.until) : '不結束'}</b>${F.until ? `<button class="tx2 sm" style="position:relative;z-index:2" onclick="event.stopPropagation();F.until='';redraw('add')">清除</button>` : ''}</span><input type="date" class="ov" value="${F.until}" onchange="F.until=this.value;redraw('add')"></div>` : ''}
+    ${rule && F.ruleId ? `<div class="frow"><span class="lb">啟用</span><span class="vl"></span><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc)" ${F.ruleActive ? 'checked' : ''} onchange="F.ruleActive=this.checked"></div>` : ''}` : '';
+  const notes = t !== 'transfer' ? noteSuggest(F.catId).filter(n => n !== F.note.trim()) : [];
+  const head = rule ? `<h2 style="font-size:16px">${F.ruleId ? '編輯固定收支' : '新增固定收支'}</h2>` :
+    `<div class="seg ${t === 'expense' ? 'exp' : t === 'income' ? 'inc' : 'tra'}"><button class="${t === 'expense' ? 'on' : ''}" onclick="setType('expense')">支出</button><button class="${t === 'income' ? 'on' : ''}" onclick="setType('income')">收入</button><button class="${t === 'transfer' ? 'on' : ''}" onclick="setType('transfer')">轉帳</button></div>`;
+  const right = F.id ? `<span style="display:flex"><button class="ib" onclick="copyTxn()">${ic('copy',21)}</button><button class="ib" onclick="delTxn()" style="color:var(--exp)">${ic('trash',21)}</button></span>`
+    : rule ? (F.ruleId ? `<button class="ib" onclick="delRule()" style="color:var(--exp)">${ic('trash',21)}</button>` : '<span style="width:40px"></span>')
+    : `<button class="ib" onclick="openTpl()">${ic('bookmark',21)}</button>`;
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('add')">${ic('x',24)}</button>${head}${right}</div>
+    ${rule ? `<div style="display:flex;justify-content:center;margin:-2px 0 6px"><div class="seg ${t === 'expense' ? 'exp' : t === 'income' ? 'inc' : 'tra'}"><button class="${t === 'expense' ? 'on' : ''}" onclick="setType('expense')">支出</button><button class="${t === 'income' ? 'on' : ''}" onclick="setType('income')">收入</button><button class="${t === 'transfer' ? 'on' : ''}" onclick="setType('transfer')">轉帳</button></div></div>` : ''}
+    <div class="fscroll">${tpls.length ? `<div class="chips">${tpls.map(p => `<button onclick="applyTpl('${p.id}')">${esc(p.name)}</button>`).join('')}</div>` : ''}${top}
+      <div class="frow date"><button onclick="F.date=addD(F.date,-1);redraw('add')">${ic('left',20)}</button><label>${rule ? '開始 ' : ''}${longDate(F.date)}<input type="date" class="ov" value="${F.date}" onchange="if(this.value)setF('date',this.value)"></label><button onclick="F.date=addD(F.date,1);redraw('add')">${ic('right',20)}</button></div>
+      ${fields}
+      <div class="frow"><span class="lb">專案</span><span class="vl"><b class="${pj ? '' : 'tx2'}">${pj ? esc(pj.name) : '無專案'}</b></span>${ic('down',16)}<select class="ov" onchange="setProj(this.value)">${projOpts()}</select></div>
+      ${repeatRow}
+      <textarea class="note" rows="2" placeholder="備註" oninput="F.note=this.value" onfocus="this.closest('.layer').classList.add('typing')" onblur="setTimeout(()=>{this.closest('.layer')?.classList.remove('typing')},150)">${esc(F.note)}</textarea>
+      ${notes.length ? `<div class="chips">${notes.map(n => `<button onmousedown="event.preventDefault()" onclick="F.note=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}
+    </div>
+    <div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','00','0','.','+'].map(k => `<button class="${OPS.test(k) ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div></div>`;
+}
+function repeatHint(d, f){ const x = pd(d); return f === 'week' ? '每' + wdName(d) : f === 'month' ? `每月 ${x.getDate()} 日` : `每年 ${x.getMonth() + 1}/${x.getDate()}`; }
+function setInst(v){
+  if (v === 'custom') { const n = parseInt(prompt('分期期數（2–120）', F.instN > 1 ? F.instN : '')); if (n >= 2 && n <= 120) F.instN = n; }
+  else F.instN = +v;
+  if (F.instN <= 1) { F.instFeeExpr = ''; if (F.active === 'ifee') F.active = 'amt'; }
+  redraw('add');
+}
+function setF(k, v){
+  F[k] = v;
+  if (k === 'accountId' || k === 'toAccountId') {
+    const A = S.data.accounts;
+    if (A[F.accountId]?.currency === A[F.toAccountId]?.currency) { F.toExpr = ''; if (F.active === 'to') F.active = 'amt'; }
+    if (A[F.accountId]?.type !== 'credit') { F.instN = 0; F.instFeeExpr = ''; if (F.active === 'ifee') F.active = 'amt'; }
+  }
+  redraw('add');
+}
+function setAct(k){ F.active = k; redraw('add'); }
+function swapAcc(){ [F.accountId, F.toAccountId] = [F.toAccountId, F.accountId]; [F.amtExpr, F.toExpr] = [F.toExpr || F.amtExpr, F.toExpr ? F.amtExpr : '']; F.active = 'amt'; redraw('add'); }
+function setProj(v){
+  if (v === '__new') { const n = prompt('專案名稱（例：2026 東京行）'); if (n && n.trim()) { const p = {id:'p_' + uid(), name:n.trim(), createdAt:Date.now(), archived:false, hidden:false}; put('projects', p, true); F.projectId = p.id; } }
+  else F.projectId = v;
+  redraw('add');
+}
+function key(k){
+  const f = {to:'toExpr', fee:'feeExpr', ifee:'instFeeExpr'}[F.active] || 'amtExpr';
+  let s = F[f]; const last = s.slice(-1);
+  if (k === 'AC') s = '';
+  else if (k === '⌫') s = s.slice(0, -1);
+  else if (OPS.test(k)) { if (!s) return; s = OPS.test(last) ? s.slice(0, -1) + k : s + k; }
+  else if (k === '.') { const seg = s.split(OPS).pop(); if (seg.includes('.')) return; s += seg === '' ? '0.' : '.'; }
+  else if (k === '00') { const seg = s.split(OPS).pop(); if (!seg || seg === '0') return; s += '00'; }
+  else { const seg = s.split(OPS).pop(); if (seg === '0') s = s.slice(0, -1) + k; else s += k; const dp = (s.split(OPS).pop().split('.')[1] || ''); if (dp.length > 2) return; }
+  if (s.length > 40) return;
+  F[f] = s; redraw('add');
+}
+function formBody(){
+  const amt = evalExpr(F.amtExpr), A = S.data.accounts;
+  if (!(amt > 0)) return toast('請輸入金額');
+  if (!A[F.accountId]) return toast('請選擇帳戶');
+  const o = {type:F.type, amount:amt, accountId:F.accountId, projectId:F.projectId || null, note:F.note.trim()};
+  if (F.type === 'transfer') {
+    if (!A[F.toAccountId] || F.toAccountId === F.accountId) return toast('轉出與轉入帳戶要不同');
+    const diff = A[F.accountId].currency !== A[F.toAccountId].currency, to = diff ? evalExpr(F.toExpr) : amt;
+    if (diff && !(to > 0)) { F.active = 'to'; redraw('add'); return toast('請輸入轉入金額'); }
+    Object.assign(o, {toAccountId:F.toAccountId, toAmount:to, fee:evalExpr(F.feeExpr) || 0, catId:FEE_CAT});
+  } else {
+    if (!S.data.categories[F.catId]) return toast('請選擇分類');
+    o.catId = F.catId;
+  }
+  return o;
+}
+function saveTxn(){
+  const o = formBody(); if (!o) return;
+  if (F.mode === 'rule') {
+    if (!F.repeat) return toast('請選擇重複頻率');
+    const old = F.ruleId ? S.data.recurring[F.ruleId] : null;
+    const r = {...(old || {}), ...o, id:F.ruleId || 'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:F.ruleActive !== false,
+      base:old && old.start === F.date && old.freq === F.repeat ? old.base : addD(F.date, -1), handled:old && old.start === F.date && old.freq === F.repeat ? (old.handled || []) : []};
+    put('recurring', r, true); closeLayer('add'); render(); redraw('rules'); toast('已儲存固定收支'); return;
+  }
+  const old = F.id ? S.data.txns[F.id] : null;
+  const t = {...(old || {}), ...o, id:F.id || 't_' + uid(), date:F.date, createdAt:F.createdAt || Date.now()};
+  delete t.inst;
+  if (old && old.rate && (S.data.accounts[old.accountId]?.currency !== S.data.accounts[t.accountId]?.currency || old.amount !== t.amount)) delete t.rate;
+  if (t.type === 'expense' && F.instN > 1 && S.data.accounts[t.accountId]?.type === 'credit') t.inst = {n:+F.instN, fee:evalExpr(F.instFeeExpr) || 0};
+  if (t.type !== 'transfer') P.lastCat[t.type] = t.catId;
+  P.lastAcc = F.accountId; savePrefs();
+  put('txns', t, true);
+  if (F.due) markHandled(F.due.rid, F.due.date);
+  if (!F.id && F.repeat) put('recurring', {...o, id:'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:true, base:F.date, handled:[]}, true);
+  S.ui.sel = t.date; closeLayer('add'); render(); redraw('due');
+  toast(F.id ? '已更新' : F.repeat ? '已記錄，並設為固定收支' : '已記錄');
+}
+function delTxn(){ if (!confirm('刪除這筆紀錄？')) return; const id = F.id; closeLayer('add'); del('txns', id); toast('已刪除'); }
+function copyTxn(){ F = {...F, id:null, createdAt:null, date:today(), repeat:'', until:'', due:null}; redraw('add'); toast('已複製，可修改後按 OK'); }
+
+/* ---------- templates ---------- */
+function openTpl(){ openLayer('tpl', renderTpl, 'btm'); }
+function renderTpl(){
+  const ts = tplList(), A = S.data.accounts;
+  const body = `${ts.length ? `<div class="list" style="margin:0 0 12px;box-shadow:none;background:var(--bg)">${ts.map(p => { const c = S.data.categories[p.catId]; return `<div class="row"><button class="mid" style="text-align:left" onclick="applyTpl('${p.id}');closeLayer('tpl')"><b>${esc(p.name)}</b><small>${p.type === 'transfer' ? '轉帳' : esc(c ? c.name : '')} · ${esc(A[p.accountId]?.name || '')}${p.amount ? ' · ' + fmt(p.amount, A[p.accountId]?.currency) : ''}</small></button><button class="mini" onclick="delTpl('${p.id}')">${ic('x',16)}</button></div>`; }).join('')}</div>` : '<div class="empty" style="padding:12px">還沒有範本</div>'}
+    <button class="btn" onclick="saveTpl()">把目前內容存成範本</button><div class="hint" style="margin:8px 0 0">範本會出現在記帳畫面上方，點一下就帶入。金額可留空。</div>`;
+  return sheet('tpl', '常用範本', body);
+}
+function saveTpl(){
+  const n = prompt('範本名稱（例：早餐、加油）'); if (!n || !n.trim()) return;
+  const amt = evalExpr(F.amtExpr);
+  put('templates', {id:'tp_' + uid(), name:n.trim(), type:F.type, catId:F.type === 'transfer' ? FEE_CAT : F.catId, accountId:F.accountId, toAccountId:F.type === 'transfer' ? F.toAccountId : null,
+    amount:amt || null, toAmount:evalExpr(F.toExpr) || null, fee:evalExpr(F.feeExpr) || null, projectId:F.projectId || null, note:F.note.trim(), order:tplList().length}, true);
+  redraw('tpl'); redraw('add'); toast('已存成範本');
+}
+function delTpl(id){ if (!confirm('刪除這個範本？')) return; del('templates', id); redraw('tpl'); redraw('add'); }
+function applyTpl(id){
+  const p = S.data.templates[id]; if (!p) return;
+  const A = S.data.accounts;
+  Object.assign(F, fFromObj(p));
+  if (!A[F.accountId] || A[F.accountId].archived) F.accountId = defaultAcc();
+  if (p.type !== 'transfer' && !S.data.categories[F.catId]) F.catId = defaultCat(p.type);
+  F.active = 'amt'; redraw('add');
+}
+
+/* ---------- recurring ---------- */
+function ruleDates(r, upto){
+  const out = []; if (!r.start) return out;
+  for (let k = 0; k < 3000; k++) {
+    const d = r.freq === 'week' ? addD(r.start, 7 * k) : r.freq === 'year' ? addM(r.start, 12 * k) : addM(r.start, k);
+    if (d > upto || (r.until && d > r.until)) break;
+    out.push(d);
+  }
+  return out;
+}
+function nextDate(r){ const ds2 = ruleDates(r, addD(today(), 800)).filter(d => d > (r.base || '') && d > today()); return ds2[0] || null; }
+function dueList(){
+  const out = [], td = today();
+  for (const r of Object.values(S.data.recurring || {})) {
+    if (r.active === false) continue;
+    const h = new Set(r.handled || []);
+    for (const d of ruleDates(r, td)) if (d > (r.base || '') && !h.has(d)) out.push({r, date:d});
+  }
+  return out.sort((a, b) => a.date < b.date ? -1 : 1);
+}
+function markHandled(rid, date){
+  const r = S.data.recurring[rid]; if (!r) return;
+  const cut = addD(today(), -400), h = [...new Set([...(r.handled || []), date])].filter(d => d >= cut).sort();
+  put('recurring', {...r, handled:h, base:r.base && r.base < cut ? addD(cut, -1) : r.base}, true);
+}
+function ruleName(r){ const c = S.data.categories[r.catId], A = S.data.accounts; return r.note || (r.type === 'transfer' ? `${A[r.accountId]?.name || '?'} → ${A[r.toAccountId]?.name || '?'}` : c ? c.name : '固定收支'); }
+function ruleTxn(r, date){
+  const t = {id:`r_${r.id}_${date}`, type:r.type, date, amount:r.amount, accountId:r.accountId, catId:r.catId, projectId:r.projectId || null, note:r.note || '', createdAt:Date.now(), rule:r.id};
+  if (r.type === 'transfer') Object.assign(t, {toAccountId:r.toAccountId, toAmount:r.toAmount || r.amount, fee:r.fee || 0, catId:FEE_CAT});
+  return t;
+}
+function dueAct(i, act){
+  const d = dueList()[i]; if (!d) return;
+  if (act === 'edit') { openAdd(null, {...fFromObj(d.r), id:null, date:d.date, due:{rid:d.r.id, date:d.date}}); F.id = null; return; }
+  if (act === 'ok') { const A = S.data.accounts; if (!A[d.r.accountId] || (d.r.type === 'transfer' && !A[d.r.toAccountId])) return toast('帳戶已不存在，請按「修改」'); put('txns', ruleTxn(d.r, d.date), true); }
+  markHandled(d.r.id, d.date); render();
+  if (dueList().length) redraw('due'); else closeLayer('due');
+  toast(act === 'ok' ? '已記入' : '已略過');
+}
+function dueAll(){ const l = dueList(); for (const d of l) { const A = S.data.accounts; if (!A[d.r.accountId]) continue; put('txns', ruleTxn(d.r, d.date), true); markHandled(d.r.id, d.date); } closeLayer('due'); render(); toast(`已記入 ${l.length} 筆`); }
+function openDue(){ openLayer('due', () => {
+  const l = dueList(), A = S.data.accounts;
+  const body = l.length ? `<div class="list" style="margin:0 0 12px;box-shadow:none;background:var(--bg)">${l.map((d, i) => { const r = d.r, a = A[r.accountId], cur = a?.currency || 'TWD';
+      return `<div class="row" style="flex-wrap:wrap"><span class="mid"><b>${esc(ruleName(r))}</b><small>${md(d.date)} ${wdName(d.date)} · ${FREQ[r.freq]} · ${esc(a?.name || '帳戶不存在')}</small></span>
+        <span class="amt ${r.type === 'expense' ? 'exp' : r.type === 'income' ? 'inc' : 'tx2'}">${fmt(r.type === 'expense' ? -r.amount : r.amount, cur, r.type !== 'transfer')}</span>
+        <div style="display:flex;gap:6px;width:100%;margin-top:8px"><button class="btn" style="padding:8px" onclick="dueAct(${i},'ok')">記入</button><button class="btn sec2" style="padding:8px" onclick="dueAct(${i},'edit')">修改後記入</button><button class="btn sec2" style="padding:8px;width:70px;flex:none" onclick="dueAct(${i},'skip')">略過</button></div></div>`; }).join('')}</div>
+    ${l.length > 1 ? `<button class="btn" onclick="dueAll()">全部記入（${l.length} 筆）</button>` : ''}` : '<div class="empty">沒有待確認的固定收支</div>';
+  return sheet('due', '固定收支待確認', body);
+}, 'btm'); }
+function openRules(){ openLayer('rules', () => {
+  const rs = Object.values(S.data.recurring || {}).sort((a, b) => ((b.active !== false) - (a.active !== false)) || ((nextDate(a) || '9') < (nextDate(b) || '9') ? -1 : 1)), A = S.data.accounts;
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('rules')">${ic('left',24)}</button><h2>固定收支</h2><button class="ib" onclick="openRule()">${ic('plus',24)}</button></div>
+    <div class="fscroll"><div class="list">${rs.length ? rs.map(r => { const a = A[r.accountId], nx = nextDate(r), c = S.data.categories[r.catId], m = catMain(c);
+      return `<button class="row" onclick="openRule('${r.id}')" style="${r.active === false ? 'opacity:.5' : ''}"><span class="cic" style="background:${r.type === 'transfer' ? 'var(--acc)' : (m?.color || '#aaa')}">${ic(r.type === 'transfer' ? 'swap' : (m?.icon || 'repeat'),20)}</span>
+        <span class="mid"><b>${esc(ruleName(r))}</b><small>${repeatHint(r.start, r.freq)}${r.active === false ? ' · 已停用' : nx ? ' · 下次 ' + md(nx) : ' · 已結束'} · ${esc(a?.name || '')}</small></span>
+        <span class="amt ${r.type === 'expense' ? 'exp' : r.type === 'income' ? 'inc' : ''}">${fmt(r.amount, a?.currency || 'TWD')}</span></button>`; }).join('') : '<div class="empty">還沒有固定收支<br>記帳時把「重複」設成每月，或按右上角＋</div>'}</div>
+    <div class="hint">時間到時，開 App 會在首頁跳提醒，確認後才記入。</div></div></div>`;
+}, 'full'); }
+function delRule(){ if (!confirm('刪除這個固定收支？已記入的紀錄會保留')) return; const id = F.ruleId; closeLayer('add'); del('recurring', id); redraw('rules'); }
+
+/* category picker */
+let CP = {main:null};
+function openCatPicker(){
+  const c = S.data.categories[F.catId]; CP.main = c ? (c.parent || c.id) : null;
+  openLayer('cat', renderCatPicker, 'btm');
+}
+function renderCatPicker(){
+  const all = Object.values(S.data.categories).filter(c => c.type === F.type && !c.hidden);
+  const mains = all.filter(c => !c.parent).sort(byOrder);
+  if (!CP.main || !mains.find(m => m.id === CP.main)) CP.main = mains[0]?.id;
+  const subs = all.filter(c => c.parent === CP.main).sort(byOrder), M = S.data.categories[CP.main];
+  const it = (c, on, fn) => `<button class="cpi ${on ? 'on' : ''}" onclick="${fn}"><span class="cic" style="background:${(catMain(c) || c).color}">${ic((catMain(c) || c).icon,18)}</span><span>${esc(c.name)}</span></button>`;
+  return `<div class="bd" onclick="closeLayer('cat')"></div><div class="sh" style="height:72vh"><div class="hd"><span>選擇分類</span><button class="mini" onclick="closeLayer('cat')">${ic('x',20)}</button></div>
+    <div class="cp"><div class="col">${mains.map(m => it(m, m.id === CP.main, `cpMain('${m.id}')`)).join('')}<button class="cpi add" onclick="quickCat(null)"><span class="cic" style="background:var(--line);color:var(--tx2)">${ic('plus',18)}</span>新增</button></div>
+    <div class="col">${M && !subs.length ? it(M, F.catId === M.id, `cpPick('${M.id}')`) : ''}${subs.map(s => it(s, s.id === F.catId, `cpPick('${s.id}')`)).join('')}${M ? `<button class="cpi add" onclick="quickCat('${M.id}')"><span class="cic" style="background:var(--line);color:var(--tx2)">${ic('plus',18)}</span>新增</button>` : ''}</div></div></div>`;
+}
+function cpMain(id){ CP.main = id; redraw('cat'); }
+function cpPick(id){ F.catId = id; closeLayer('cat'); redraw('add'); }
+function quickCat(parent){
+  const n = prompt(parent ? '子分類名稱' : '主分類名稱'); if (!n || !n.trim()) return;
+  const sibs = Object.values(S.data.categories).filter(c => c.type === F.type && c.parent === parent);
+  const p = parent ? S.data.categories[parent] : null;
+  const c = {id:'c_' + uid(), type:F.type, name:n.trim(), parent, icon:p ? p.icon : 'more', color:p ? p.color : PALETTE[sibs.length % PALETTE.length], order:sibs.length, hidden:false};
+  put('categories', c, true);
+  if (parent) { F.catId = c.id; closeLayer('cat'); redraw('add'); } else { CP.main = c.id; redraw('cat'); }
+}
+
+
+/* ---------- reports ---------- */
+function rpRange(r = S.ui.rp){
+  if (r.per === 'month') return [ds(new Date(r.y, r.m, 1)), ds(new Date(r.y, r.m, dim(r.y, r.m))), `${r.y} 年 ${r.m+1} 月`];
+  return [`${r.y}-01-01`, `${r.y}-12-31`, `${r.y} 年`];
+}
+function rpShift(n){ const r = S.ui.rp; if (r.per === 'month') { r.m += n; while (r.m < 0) { r.m += 12; r.y--; } while (r.m > 11) { r.m -= 12; r.y++; } } else r.y += n; render(); }
+function inCatId(l, id){ if (l === id) return true; const c = S.data.categories[l]; return !!c && c.parent === id; }
+function mainId(leaf){ const c = S.data.categories[leaf]; return c ? (c.parent || c.id) : '_none'; }
+function catFlows(from, to, type, opt = {}){
+  return flowsIn(from, to).filter(f => f.type === type && (!opt.project || f.proj === opt.project) && (!opt.cat || inCatId(f.cat, opt.cat)));
+}
+function catTotals(from, to, type, opt = {}){
+  const out = {};
+  for (const f of catFlows(from, to, type, opt)) { const k = opt.leaf ? f.cat : mainId(f.cat); out[k] = (out[k] || 0) + f.amt; }
+  return out;
+}
+function catItems(tot, shade){
+  const items = Object.entries(tot).map(([id, val]) => { const c = S.data.categories[id]; return {id, val, name:c ? c.name : '未分類', color:c ? c.color : '#aaa', icon:c ? (catMain(c) || c).icon : 'more'}; }).sort((a, b) => b.val - a.val);
+  if (shade) items.forEach((it, i) => { it.color = i % 2 ? mix(it.color, '#000000', Math.min(.45, i * .06)) : mix(it.color, '#FFFFFF', Math.min(.6, i * .07)); });
+  return items;
+}
+function donut(items, top, big){
+  const tot = items.reduce((s, i) => s + i.val, 0), R = 70, C = 2 * Math.PI * R; let off = 0, segs = '';
+  if (tot > 0) for (const it of items) { const len = it.val / tot * C; segs += `<circle r="${R}" cx="90" cy="90" fill="none" stroke="${it.color}" stroke-width="26" stroke-dasharray="${Math.max(0, len - 1.2)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 90 90)"/>`; off += len; }
+  else segs = `<circle r="${R}" cx="90" cy="90" fill="none" style="stroke:var(--line)" stroke-width="26"/>`;
+  return `<div class="donut"><svg width="200" height="200" viewBox="0 0 180 180">${segs}
+    <text x="90" y="82" text-anchor="middle" font-size="11" style="fill:var(--tx2)">${esc(top)}</text>
+    <text x="90" y="104" text-anchor="middle" font-size="${big.length > 10 ? 15 : 18}" font-weight="700" style="fill:var(--tx)">${esc(big)}</text></svg></div>`;
+}
+function catList(items, onclick){
+  const tot = items.reduce((s, i) => s + i.val, 0);
+  if (!items.length) return '<div class="empty">這段期間沒有紀錄</div>';
+  return items.map(it => { const pc = tot ? it.val / tot * 100 : 0; return `<button class="row" ${onclick ? `onclick="${onclick(it)}"` : ''}><span class="cic" style="background:${it.color}">${ic(it.icon,20)}</span>
+    <span class="mid"><b>${esc(it.name)} <span class="tx2 sm" style="font-weight:400">${pc.toFixed(1)}%</span></b><div class="pbar"><i style="width:${pc}%;background:${it.color}"></i></div></span>
+    <span class="amt">${twd(it.val)}</span></button>`; }).join('');
+}
+function bars(labels, sets, showEvery = 1){
+  const W = 340, H = 170, pb = 20, pt = 14, n = labels.length, g = W / n;
+  const bw = Math.max(2, Math.min(12, (g - 3) / sets.length));
+  const max = Math.max(1, ...sets.flatMap(s => s.vals));
+  let out = `<line x1="0" x2="${W}" y1="${H - pb}" y2="${H - pb}" style="stroke:var(--line)"/>`;
+  labels.forEach((lb, i) => {
+    const x0 = i * g + (g - bw * sets.length) / 2;
+    sets.forEach((s, j) => { const h = s.vals[i] / max * (H - pb - pt); if (h > 0) out += `<rect x="${x0 + j * bw}" y="${H - pb - h}" width="${bw - 1}" height="${h}" rx="2" fill="${s.color}"/>`; });
+    if (i % showEvery === 0 || i === n - 1) out += `<text x="${i * g + g / 2}" y="${H - 5}" text-anchor="middle" font-size="10" style="fill:var(--tx2)">${lb}</text>`;
+  });
+  out += `<text x="2" y="10" font-size="10" style="fill:var(--tx2)">${twd(max)}</text>`;
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}">${out}</svg></div>`;
+}
+function lineChart(labels, vals, color){
+  const W = 340, H = 170, pb = 20, pt = 16, n = labels.length, g = W / n;
+  const mx = Math.max(...vals), mn = Math.min(...vals, 0), span = (mx - mn) || 1;
+  const y = v => pt + (mx - v) / span * (H - pb - pt), pts = vals.map((v, i) => `${i * g + g / 2},${y(v)}`).join(' ');
+  let out = `<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line)" stroke-dasharray="3 3"/><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round"/>`;
+  vals.forEach((v, i) => { out += `<circle cx="${i * g + g / 2}" cy="${y(v)}" r="3" fill="${color}"/><text x="${i * g + g / 2}" y="${H - 5}" text-anchor="middle" font-size="10" style="fill:var(--tx2)">${labels[i]}</text>`; });
+  return `<div class="chart"><svg viewBox="0 0 ${W} ${H}">${out}</svg></div>`;
+}
+function monthsBack(y, m, n){ const out = []; for (let i = n - 1; i >= 0; i--) { let mm = m - i, yy = y; while (mm < 0) { mm += 12; yy--; } out.push([yy, mm]); } return out; }
+function periodBar(){
+  const r = S.ui.rp, [, , label] = rpRange();
+  return `<div class="rbar"><div class="seg"><button class="${r.per === 'month' ? 'on' : ''}" onclick="S.ui.rp.per='month';render()">月</button><button class="${r.per === 'year' ? 'on' : ''}" onclick="S.ui.rp.per='year';render()">年</button></div>
+    <div class="nav2"><button onclick="rpShift(-1)">${ic('left',20)}</button><span>${label}</span><button onclick="rpShift(1)">${ic('right',20)}</button></div></div>`;
+}
+function viewReports(){
+  const r = S.ui.rp, sg = (k, l) => `<button class="${r.seg === k ? 'on' : ''}" onclick="S.ui.rp.seg='${k}';render()">${l}</button>`;
+  let body = '';
+  if (r.seg === 'cat') {
+    const [from, to] = rpRange(), items = catItems(catTotals(from, to, r.type)), tot = items.reduce((s, i) => s + i.val, 0);
+    body = `${periodBar()}<div class="segw" style="margin-top:8px"><div class="seg ${r.type === 'expense' ? 'exp' : 'inc'}"><button class="${r.type === 'expense' ? 'on' : ''}" onclick="S.ui.rp.type='expense';render()">支出</button><button class="${r.type === 'income' ? 'on' : ''}" onclick="S.ui.rp.type='income';render()">收入</button></div></div>
+      <div class="card">${donut(items, r.type === 'expense' ? '總支出' : '總收入', twd(tot))}</div>
+      <div class="list">${catList(items, it => `openCatRpt('${it.id}','${from}','${to}','${r.type}')`)}</div>`;
+  } else if (r.seg === 'trend') {
+    const [from, to] = rpRange();
+    if (r.per === 'year') {
+      const ms = monthsBack(r.y, 11, 12), rows = ms.map(([y, m]) => ({m, ...summary(ds(new Date(y, m, 1)), ds(new Date(y, m, dim(y, m))))}));
+      const ti = rows.reduce((s, x) => s + x.inc, 0), te = rows.reduce((s, x) => s + x.exp, 0);
+      body = `${periodBar()}<div class="card">${bars(rows.map(x => x.m + 1), [{vals:rows.map(x => x.inc), color:'var(--inc)'}, {vals:rows.map(x => x.exp), color:'var(--exp)'}])}
+        <div class="legend"><span><i style="background:var(--inc)"></i>收入</span><span><i style="background:var(--exp)"></i>支出</span></div></div>
+        <div class="card"><table class="tbl"><tr><th>月份</th><th>收入</th><th>支出</th><th>結餘</th></tr>
+        ${rows.map(x => `<tr onclick="S.ui.rp={...S.ui.rp,seg:'trend',per:'month',m:${x.m}};render()" style="cursor:pointer"><td>${x.m + 1} 月</td><td class="inc">${twd(x.inc)}</td><td class="exp">${twd(x.exp)}</td><td class="${x.inc - x.exp < 0 ? 'exp' : ''}">${twd(x.inc - x.exp)}</td></tr>`).join('')}
+        <tr><td><b>全年</b></td><td class="inc b">${twd(ti)}</td><td class="exp b">${twd(te)}</td><td class="b ${ti - te < 0 ? 'exp' : ''}">${twd(ti - te)}</td></tr></table></div>`;
+    } else {
+      const n = dim(r.y, r.m), days = [...Array(n)].map((_, i) => summary(ds(new Date(r.y, r.m, i + 1)), ds(new Date(r.y, r.m, i + 1))));
+      const s = summary(from, to), passed = r.y === new Date().getFullYear() && r.m === new Date().getMonth() ? new Date().getDate() : n;
+      const act = days.map((d, i) => ({...d, i})).filter(d => d.inc || d.exp).reverse();
+      body = `${periodBar()}<div class="card">${bars(days.map((_, i) => i + 1), [{vals:days.map(d => d.inc), color:'var(--inc)'}, {vals:days.map(d => d.exp), color:'var(--exp)'}], 5)}
+        <div class="legend"><span><i style="background:var(--inc)"></i>收入</span><span><i style="background:var(--exp)"></i>支出</span></div></div>
+        <div class="card"><div class="kv"><div><small>收入</small><b class="inc">${twd(s.inc)}</b></div><div><small>支出</small><b class="exp">${twd(s.exp)}</b></div>
+        <div><small>結餘</small><b>${twd(s.inc - s.exp)}</b></div><div><small>日均支出</small><b>${twd(s.exp / passed)}</b></div></div></div>
+        <div class="sec"><h3>每日收支</h3><span class="sm tx2">點日期看明細</span></div>
+        <div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>日期</th><th>收入</th><th>支出</th><th>結餘</th></tr>
+        ${act.length ? act.map(d => { const x = ds(new Date(r.y, r.m, d.i + 1)); return `<tr onclick="S.ui.sel='${x}';go('home')" style="cursor:pointer"><td>${d.i + 1} 日（${WD[pd(x).getDay()]}）</td><td class="inc">${d.inc ? twd(d.inc) : ''}</td><td class="exp">${d.exp ? twd(d.exp) : ''}</td><td class="${d.inc - d.exp < 0 ? 'exp' : ''}">${twd(d.inc - d.exp)}</td></tr>`; }).join('') : '<tr><td colspan="4" class="tx2" style="text-align:center">沒有紀錄</td></tr>'}</table></div>`;
+    }
+  } else if (r.seg === 'budget') {
+    body = viewBudget();
+  } else if (r.seg === 'asset') {
+    const now = new Date(), ms = monthsBack(now.getFullYear(), now.getMonth(), 12), c = compute(), accs = Object.values(S.data.accounts).filter(a => a.inNW !== false);
+    const rows = ms.map(([y, m]) => {
+      const end = ds(new Date(y, m, dim(y, m))); let as = 0, li = 0;
+      for (const a of accs) { let b = +a.init || 0; for (const t of c.list) { if (t.date > end) break; b += delta(t, a.id); } const v = b * rate(a.currency); if (v >= 0) as += v; else li -= v; }
+      return {m, as, li, net:as - li};
+    });
+    body = `<div class="card"><div class="sm tx2" style="margin-bottom:4px">近 12 個月淨資產（月底）</div>${lineChart(rows.map(x => x.m + 1), rows.map(x => x.net), 'var(--acc)')}</div>
+      <div class="card"><table class="tbl"><tr><th>月份</th><th>資產</th><th>負債</th><th>淨資產</th></tr>
+      ${rows.slice().reverse().map(x => `<tr><td>${x.m + 1} 月</td><td class="inc">${twd(x.as)}</td><td class="exp">${twd(x.li)}</td><td class="b ${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td></tr>`).join('')}</table></div>
+      <div class="hint">外幣以目前匯率換算</div>`;
+  } else {
+    const ps = Object.values(S.data.projects).filter(p => !p.hidden).sort((a, b) => (a.archived - b.archived) || (b.createdAt || 0) - (a.createdAt || 0));
+    body = `<div class="list" style="margin-top:8px">${ps.length ? ps.map(p => { const e = Object.values(catTotals('0000', '9999', 'expense', {project:p.id})).reduce((s, v) => s + v, 0), i = Object.values(catTotals('0000', '9999', 'income', {project:p.id})).reduce((s, v) => s + v, 0);
+      return `<button class="row" onclick="openProjRpt('${p.id}')"><span class="cic" style="background:${p.archived ? 'var(--tx2)' : 'var(--acc)'}">${ic('folder',20)}</span><span class="mid"><b>${esc(p.name)}${p.archived ? '（已結束）' : ''}</b>${i ? `<small>收入 ${twd(i)}</small>` : ''}</span><span class="amt exp">${twd(e)}</span></button>`; }).join('') : '<div class="empty">還沒有專案</div>'}</div>`;
+  }
+  return `<div class="top"><h1>報表</h1></div><div class="segw"><div class="seg">${sg('cat','分類')}${sg('trend','收支')}${sg('budget','預算')}${sg('asset','資產')}${sg('proj','專案')}</div></div>${body}`;
+}
+let CRN = 0;
+function openCatRpt(id, from, to, type){
+  const key = 'crp' + (++CRN), c = S.data.categories[id];
+  openLayer(key, () => {
+    const isMain = c && !c.parent, subTot = isMain ? catTotals(from, to, type, {cat:id, leaf:true}) : {};
+    const subs = catItems(subTot, true), tot = Object.values(catTotals(from, to, type, {cat:id})).reduce((s, v) => s + v, 0);
+    const e = pd(to), ms = monthsBack(e.getFullYear(), e.getMonth(), 12);
+    const trend = ms.map(([y, m]) => Object.values(catTotals(ds(new Date(y, m, 1)), ds(new Date(y, m, dim(y, m))), type, {cat:id})).reduce((s, v) => s + v, 0));
+    const txs = [...new Set(catFlows(from, to, type, {cat:id}).map(f => f.t))].reverse();
+    const color = c ? c.color : '#aaa', avg = trend.reduce((s, v) => s + v, 0) / 12;
+    return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('${key}')">${ic('left',24)}</button><h2>${esc(c ? (c.parent ? catMain(c).name + ' › ' : '') + c.name : '未分類')}</h2><span style="width:40px"></span></div>
+      <div class="fscroll"><div class="card mt0"><small class="tx2">${from.replace(/-/g,'/')} – ${to.replace(/-/g,'/')}</small><div style="font-size:28px;font-weight:800" class="${type === 'expense' ? 'exp' : 'inc'}">${twd(tot)}</div><small class="tx2">${txs.length} 筆</small></div>
+      ${isMain && subs.length > 1 ? `<div class="card">${donut(subs, '子分類', twd(tot))}</div><div class="list">${catList(subs, it => `openCatRpt('${it.id}','${from}','${to}','${type}')`)}</div>` : ''}
+      <div class="card"><div class="sm tx2" style="margin-bottom:4px">近 12 個月 · 月均 ${twd(avg)}</div>${bars(ms.map(([, m]) => m + 1), [{vals:trend, color}])}</div>
+      <div class="sec"><h3>明細</h3></div><div class="list">${txs.length ? txs.map(t => txnRow(t)).join('') : '<div class="empty">沒有紀錄</div>'}</div><div style="height:30px"></div></div></div>`;
+  }, 'full');
+}
+function openProjRpt(id){
+  const p = S.data.projects[id];
+  openLayer('prp', () => {
+    const items = catItems(catTotals('0000', '9999', 'expense', {project:id})), tot = items.reduce((s, i) => s + i.val, 0);
+    const txs = compute().list.filter(t => t.projectId === id).reverse();
+    const dates = txs.map(t => t.date).sort();
+    return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('prp')">${ic('left',24)}</button><h2>${esc(p.name)}</h2><span style="width:40px"></span></div>
+      <div class="fscroll">${dates.length ? `<div class="hint" style="text-align:center">${dates[0].replace(/-/g,'/')} – ${dates[dates.length-1].replace(/-/g,'/')}</div>` : ''}
+      <div class="card">${donut(items, '專案支出', twd(tot))}</div><div class="list">${catList(items)}</div>
+      <div class="sec"><h3>明細</h3><span class="sm tx2">${txs.length} 筆</span></div><div class="list">${txs.length ? txs.map(t => txnRow(t)).join('') : '<div class="empty">沒有紀錄</div>'}</div><div style="height:30px"></div></div></div>`;
+  }, 'full');
+}
+
+
+/* ---------- bulk write ---------- */
+async function bulkPut(col, arr){
+  const now = Date.now();
+  for (const o of arr) { o.updatedAt = now; S.data[col][o.id] = o; }
+  bump();
+  if (S.mode === 'cloud' && ledgerRef) {
+    for (let i = 0; i < arr.length; i += 400) { const b = db.batch(); arr.slice(i, i + 400).forEach(o => b.set(ledgerRef.collection(col).doc(o.id), o)); await b.commit(); }
+  } else saveLocal();
+}
+
+/* ---------- CMoney import ---------- */
+function parseCSVText(text){
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ',') { row.push(f); f = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i+1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+    else f += ch;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+function cmoneyRows(text){
+  const raw = parseCSVText(text.replace(/^﻿/, ''));
+  const h = raw[0] || [], need = ['日期','類別','主分類','子分類','帳戶','專案','金額','匯率','轉帳','備註'];
+  if (!need.every(k => h.includes(k))) throw new Error('欄位不符，請確認是 CMoney 匯出的記帳 CSV');
+  const out = [];
+  for (const x of raw.slice(1)) {
+    if (!x.length || (x.length === 1 && x[0] === '')) continue;
+    if (/^\d{4}\/\d{1,2}\/\d{1,2}$/.test(x[0]) && x.length >= h.length - 1) { const o = {}; h.forEach((k, i) => o[k] = x[i] ?? ''); out.push(o); }
+    else if (out.length) out[out.length - 1]['備註'] += '\n' + x.join(',');
+  }
+  return out;
+}
+const MAIN_ICON = [[/飲食|餐/,'food'],[/交通|車/,'car'],[/購物/,'bag'],[/娛樂/,'star'],[/家庭|家用/,'family'],[/醫療|健康/,'health'],[/學習|教育/,'book'],[/送禮|捐/,'gift'],[/電信|通訊/,'phone'],[/稅|金融|保險|銀行/,'bank'],[/住家|居家|房/,'home'],[/主動/,'work'],[/被動|投資|利息/,'coin'],[/意外|獎/,'sparkle'],[/旅/,'plane'],[/寵物/,'paw']];
+function guessCur(r){ if (!r || r === 1) return 'TWD'; if (r >= .1 && r <= .35) return 'JPY'; if (r >= 3.6 && r <= 4.3) return 'HKD'; if (r >= .015 && r < .04) return 'KRW'; if (r >= 25 && r <= 36) return 'USD'; if (r >= .7 && r <= 1.2) return 'THB'; return 'TWD'; }
+function guessType(n, cur){ if (/信用卡|YPay|Uniopen|富邦J|聯名卡/i.test(n)) return 'credit'; if (/現金|^日$|^港$|^美$/.test(n)) return 'cash'; if (/銀行|中信|台新|國泰|玉山|郵局|兆豐|第一|華南|彰銀|土銀|台銀|永豐|元大|凱基|LINE Bank|將來|樂天/i.test(n)) return 'bank'; return 'epay'; }
+function hashStr(s){ let h = 5381; for (let i = 0; i < s.length; i++) h = (h * 33 ^ s.charCodeAt(i)) >>> 0; return h.toString(36); }
+let IMP = null;
+function pickImport(){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,.json,text/csv,application/json';
+  inp.onchange = () => { const f = inp.files[0]; if (!f) return; const rd = new FileReader();
+    rd.onload = () => { try {
+      const text = String(rd.result).replace(/^\uFEFF/, '');
+      if (/\.json$/i.test(f.name) || text.trim().startsWith('{')) {
+        const j = JSON.parse(text); if (j.app !== 'Money' || !j.data) throw new Error('不是 Money 的備份檔');
+        IMP = {kind:'json', json:j}; return openLayer('imp', renderJsonImport, 'btm');
+      }
+      const head = (parseCSVText(text.split(/\r?\n/, 1)[0])[0] || []);
+      if (head.includes('類型') && head.includes('轉入帳戶')) { IMP = {kind:'money', rows:moneyRows(text)}; return openLayer('imp', renderMoneyImport, 'btm'); }
+      IMP = {kind:'cmoney', rows:cmoneyRows(text), replace:!Object.keys(S.data.txns).length}; openLayer('imp', renderImport, 'btm');
+    } catch(e) { toast(e.message); } };
+    rd.readAsText(f, 'utf-8'); };
+  BUSY_UNTIL = Date.now() + 180000; inp.onchange = (o => function(){ BUSY_UNTIL = 0; return o.apply(this, arguments); })(inp.onchange);
+  inp.click();
+}
+function buildImport(rows, replace){
+  const C = S.data.categories, A = S.data.accounts;
+  const accByName = {}; Object.values(A).forEach(a => accByName[a.name] = a);
+  const projByName = {}; Object.values(S.data.projects).filter(p => !p.hidden).forEach(p => projByName[p.name] = p);
+  const newAcc = [], newCat = [], newProj = [], txns = [], hide = [];
+  const live = replace ? {} : null;
+  const catKey = (type, main, sub) => `${type}|${main}|${sub || ''}`;
+  const catIdx = {};
+  if (!replace) for (const c of Object.values(C)) { if (c.hidden) continue; const m = c.parent ? C[c.parent] : null; catIdx[catKey(c.type, m ? m.name : c.name, m ? c.name : '')] = c.id; }
+  else for (const c of Object.values(C)) if (!c.hidden && c.id !== FEE_CAT) hide.push(c);
+  const accOrder = Object.keys(A).length;
+  const getAcc = (name, rate) => {
+    if (accByName[name]) return accByName[name].id;
+    const cur = guessCur(rate), id = 'a_' + hashStr('acc|' + name), ty = guessType(name, cur);
+    const a = {id, name, type:ty, currency:cur, init:0, initRate:cur !== 'TWD' ? rate : null, order:accOrder + newAcc.length, color:{cash:'#4F6D7A', bank:'#2E86AB', credit:'#D1495B', epay:'#E8A33C', other:'#888888'}[ty], archived:false};
+    accByName[name] = a; newAcc.push(a); return id;
+  };
+  const getCat = (type, main, sub) => {
+    if (!main) main = '其他'; const k = catKey(type, main, sub);
+    if (catIdx[k]) return catIdx[k];
+    if (type === 'expense' && sub === '手續費' && /金融/.test(main)) { catIdx[k] = FEE_CAT; return FEE_CAT; }
+    let pk = catKey(type, main, ''), pid = catIdx[pk];
+    if (!pid) {
+      const def = Object.values(DEF_CATS[type]).find(d => d[0] === main);
+      const ico = (MAIN_ICON.find(([re]) => re.test(main)) || [0, 'more'])[1];
+      pid = 'c_' + hashStr(pk);
+      newCat.push({id:pid, type, name:main, parent:null, icon:def ? def[1] : ico, color:def ? def[2] : PALETTE[(newCat.filter(c => !c.parent).length + 3) % PALETTE.length], order:newCat.filter(c => !c.parent && c.type === type).length, hidden:false});
+      catIdx[pk] = pid;
+    }
+    if (!sub) return pid;
+    const p = newCat.find(c => c.id === pid) || C[pid], id = 'c_' + hashStr(k);
+    newCat.push({id, type, name:sub, parent:pid, icon:p.icon, color:p.color, order:newCat.filter(c => c.parent === pid).length, hidden:false});
+    catIdx[k] = id; return id;
+  };
+  const getProj = n => { if (!n || n === '無特別專案') return null; if (projByName[n]) return projByName[n].id; const p = {id:'p_' + hashStr('proj|' + n), name:n, createdAt:Date.now(), archived:false, hidden:false}; projByName[n] = p; newProj.push(p); return p.id; };
+  const seen = {}, mkId = key => { seen[key] = (seen[key] || 0) + 1; return 'm_' + hashStr(key + '#' + seen[key]); };
+  const toDate = s => s.split('/').map((v, i) => i ? pad(+v) : v).join('-');
+  let skipped = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i], amt = parseFloat(r['金額']) || 0, rate = parseFloat(r['匯率']) || 1, date = toDate(r['日期']);
+    const ca = i;
+    if (r['轉帳'] === 'yes' && r['類別'] === '支出' && !r['主分類']) {
+      const to = rows[i+1], fee = rows[i+2];
+      if (!to || to['類別'] !== '收入' || to['轉帳'] !== 'yes') { skipped++; continue; }
+      const hasFee = fee && fee['轉帳'] === 'yes' && fee['主分類'] && fee['類別'] === '支出';
+      const fa = getAcc(r['帳戶'], rate), ta = getAcc(to['帳戶'], parseFloat(to['匯率']) || 1);
+      const note = [r['備註'], to['備註'], hasFee ? fee['備註'] : ''].map(s => (s || '').trim()).filter(Boolean).filter((v, k, a) => a.indexOf(v) === k).join('\n');
+      txns.push({id:mkId(['T', date, r['帳戶'], to['帳戶'], amt, to['金額'], note].join('|')), type:'transfer', date, amount:amt, accountId:fa, toAccountId:ta, toAmount:parseFloat(to['金額']) || amt,
+        fee:hasFee ? (parseFloat(fee['金額']) || 0) : 0, catId:FEE_CAT, projectId:getProj(r['專案']), note, createdAt:Date.parse(date) + ca, src:'cmoney'});
+      i += hasFee ? 2 : 1; continue;
+    }
+    const type = r['類別'] === '收入' ? 'income' : r['類別'] === '支出' ? 'expense' : null;
+    if (!type || !(amt > 0)) { skipped++; continue; }
+    const aid = getAcc(r['帳戶'], rate), cur = (A[aid] || newAcc.find(a => a.id === aid)).currency;
+    const t = {id:mkId([type, date, r['主分類'], r['子分類'], r['帳戶'], amt, r['備註']].join('|')), type, date, amount:amt, accountId:aid, catId:getCat(type, r['主分類'], r['子分類']),
+      projectId:getProj(r['專案']), note:(r['備註'] || '').trim(), createdAt:Date.parse(date) + ca, src:'cmoney'};
+    if (cur !== 'TWD' && rate !== 1) { const sub = parseFloat(r['小計']); t.rate = sub > 0 ? sub / amt : rate; }
+    if (r['發票號碼']) t.invoice = r['發票號碼'];
+    txns.push(t);
+  }
+  const usedCats = new Set(txns.map(t => t.catId));
+  const keepHide = hide.filter(c => !Object.values(S.data.txns).some(t => t.catId === c.id) && !usedCats.has(c.id));
+  return {newAcc, newCat, newProj, txns, hide:keepHide, skipped};
+}
+function renderImport(){
+  const b = buildImport(IMP.rows, IMP.replace), ex = b.txns.filter(t => S.data.txns[t.id]).length;
+  const ds0 = b.txns.map(t => t.date).sort(), cnt = k => b.txns.filter(t => t.type === k).length;
+  IMP.b = b;
+  const body = `<div class="kv"><div><small>紀錄</small><b>${b.txns.length} 筆</b></div><div><small>期間</small><b class="sm">${ds0[0] || '-'} ～ ${ds0[ds0.length-1] || '-'}</b></div>
+      <div><small>支出／收入／轉帳</small><b class="sm">${cnt('expense')}／${cnt('income')}／${cnt('transfer')}</b></div><div><small>已存在（會覆蓋）</small><b>${ex} 筆</b></div></div>
+    <div class="fld" style="margin-top:14px"><label>新增帳戶（${b.newAcc.length}）——類型、幣別是自動判斷，匯入後可改</label>
+      <div class="cm-subs">${b.newAcc.map(a => `<span style="padding-right:10px">${esc(a.name)} · ${TYPES[a.type][0]} · ${a.currency}</span>`).join('') || '<span style="padding-right:10px">無</span>'}</div></div>
+    <div class="fld"><label>新增分類 ${b.newCat.filter(c => !c.parent).length} 個主分類、${b.newCat.filter(c => c.parent).length} 個子分類；新增專案 ${b.newProj.length} 個</label></div>
+    <div class="tog"><span>用 CSV 的分類取代預設分類<br><small class="tx2">未被使用的預設分類會隱藏</small></span><input type="checkbox" ${IMP.replace ? 'checked' : ''} onchange="IMP.replace=this.checked;redraw('imp')"></div>
+    ${b.skipped ? `<div class="hint" style="margin:6px 0">略過 ${b.skipped} 列無法辨識的資料</div>` : ''}
+    <div class="hint" style="margin:8px 0">CSV 沒有帳戶初始餘額。匯入後到「帳戶 → 編輯 → 校正目前餘額」填實際數字，就會自動對齊。</div>
+    <button class="btn" onclick="doImport()">開始匯入</button>`;
+  return sheet('imp', '匯入 CMoney', body);
+}
+async function doImport(){
+  const b = IMP.b; closeLayer('imp'); toast('匯入中…');
+  try {
+    if (b.hide.length) await bulkPut('categories', b.hide.map(c => ({...c, hidden:true})));
+    if (IMP.replace) {
+      const fin = Object.values({...S.data.categories, ...Object.fromEntries(b.newCat.map(c => [c.id, c]))}).find(c => c.type === 'expense' && !c.parent && !c.hidden && /金融/.test(c.name));
+      const fee = S.data.categories[FEE_CAT];
+      if (fee) await bulkPut('categories', [{...fee, hidden:false, parent:fin ? fin.id : fee.parent, icon:fin ? fin.icon : fee.icon, color:fin ? fin.color : fee.color}]);
+      if (!fin && S.data.categories[fee?.parent]) await bulkPut('categories', [{...S.data.categories[fee.parent], hidden:false}]);
+    }
+    await bulkPut('accounts', b.newAcc); await bulkPut('categories', b.newCat); await bulkPut('projects', b.newProj); await bulkPut('txns', b.txns);
+    render(); toast(`已匯入 ${b.txns.length} 筆`);
+  } catch(e) { toast('匯入失敗：' + (e.code || e.message)); }
+}
+
+
+/* ---------- export ---------- */
+const CSV_HEAD = ['日期','類型','主分類','子分類','帳戶','幣別','金額','轉入帳戶','轉入幣別','轉入金額','手續費','台幣金額','專案','備註','發票號碼','分期期數','分期手續費','ID'];
+const csvCell = v => { v = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+function catNames(id){ const c = S.data.categories[id]; if (!c) return ['', '']; const m = c.parent ? S.data.categories[c.parent] : null; return m ? [m.name, c.name] : [c.name, '']; }
+function exportCSV(from, to){
+  const c = compute(), A = S.data.accounts, P2 = S.data.projects, lines = [CSV_HEAD.join(',')];
+  const rnd = n => Math.round(n * 100) / 100;
+  for (const t of c.list) {
+    if ((from && t.date < from) || (to && t.date > to)) continue;
+    const a = A[t.accountId], b = A[t.toAccountId], tr = t.type === 'transfer', [m, sb] = tr ? ['', ''] : catNames(t.catId);
+    lines.push([t.date, {expense:'支出', income:'收入', transfer:'轉帳'}[t.type], m, sb, a ? a.name : '', a ? a.currency : '', t.amount,
+      tr && b ? b.name : '', tr && b ? b.currency : '', tr ? (t.toAmount || t.amount) : '', tr ? (t.fee || 0) : '', rnd(c.tw[t.id]?.amt || 0),
+      P2[t.projectId] && !P2[t.projectId].hidden ? P2[t.projectId].name : '', t.note || '', t.invoice || '', t.inst?.n > 1 ? t.inst.n : '', t.inst?.n > 1 ? (t.inst.fee || 0) : '', t.id].map(csvCell).join(','));
+  }
+  saveFile(`Money_${from || '全部'}${to ? '_' + to : ''}.csv`, '﻿' + lines.join('\r\n'), 'text/csv', lines.length - 1);
+}
+function exportJSON(){
+  const j = {app:'Money', version:VERSION, exportedAt:new Date().toISOString(), data:S.data, settings:S.settings};
+  saveFile(`Money_備份_${today()}.json`, JSON.stringify(j), 'application/json', Object.keys(S.data.txns).length);
+  P.lastBackup = Date.now(); P.backupSnooze = 0; savePrefs(); if (S.ui.tab === 'home') render();
+}
+async function saveFile(name, text, type, n){
+  BUSY_UNTIL = Date.now() + 120000; setTimeout(() => { BUSY_UNTIL = 0; }, 120000);
+  const blob = new Blob([text], {type:type + ';charset=utf-8'});
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (mobile && navigator.canShare) {
+    try { const f = new File([blob], name, {type}); if (navigator.canShare({files:[f]})) { await navigator.share({files:[f], title:name}); toast(`已匯出 ${n} 筆`); return; } }
+    catch(e) { if (e && e.name === 'AbortError') return; }
+  }
+  const u = URL.createObjectURL(blob), a = document.createElement('a'); a.dataset.own = '1'; a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(u), 4000); toast(`已匯出 ${n} 筆`);
+}
+let EX = {from:'', to:''};
+function openExport(){ EX = {from:'', to:''}; openLayer('exp', renderExport, 'btm'); }
+function renderExport(){
+  const y = new Date().getFullYear(), set = (f, t) => `EX.from='${f}';EX.to='${t}';redraw('exp')`;
+  const n = Object.values(S.data.txns).filter(t => (!EX.from || t.date >= EX.from) && (!EX.to || t.date <= EX.to)).length;
+  const body = `<div class="fld"><label>CSV 期間</label><div class="sw" style="gap:6px;margin-bottom:8px">
+      <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set('', '')}">全部</button>
+      <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set(y + '-01-01', y + '-12-31')}">今年</button>
+      <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set((y - 1) + '-01-01', (y - 1) + '-12-31')}">去年</button>
+      <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set(today().slice(0, 8) + '01', today())}">本月</button></div>
+      <div class="two"><input type="date" value="${EX.from}" onchange="EX.from=this.value;redraw('exp')"><input type="date" value="${EX.to}" onchange="EX.to=this.value;redraw('exp')"></div></div>
+    <button class="btn" onclick="exportCSV(EX.from,EX.to)">匯出 CSV（${n} 筆）</button>
+    <div class="hint" style="margin:8px 0 16px">Excel、Google 試算表、Numbers 都能開。這個檔也能匯回 Money。</div>
+    <button class="btn sec2" onclick="exportJSON()">完整備份（含帳戶、分類、專案、設定）</button>
+    <div class="hint" style="margin:8px 0 0">換手機或出問題時，用「匯入」選這個檔就能還原。</div>`;
+  return sheet('exp', '匯出', body);
+}
+
+/* ---------- Money CSV / JSON import ---------- */
+function moneyRows(text){
+  const raw = parseCSVText(text.replace(/^﻿/, '')), h = raw[0] || [];
+  return raw.slice(1).filter(x => x.length > 1).map(x => { const o = {}; h.forEach((k, i) => o[k] = x[i] ?? ''); return o; });
+}
+function buildMoneyImport(rows){
+  const C = S.data.categories, A = S.data.accounts;
+  const accByName = {}; Object.values(A).forEach(a => accByName[a.name] = a);
+  const projByName = {}; Object.values(S.data.projects).filter(p => !p.hidden).forEach(p => projByName[p.name] = p);
+  const catIdx = {}; for (const c of Object.values(C)) { if (c.hidden) continue; const m = c.parent ? C[c.parent] : null; catIdx[`${c.type}|${m ? m.name : c.name}|${m ? c.name : ''}`] = c.id; }
+  const newAcc = [], newCat = [], newProj = [], txns = []; let skipped = 0;
+  const getAcc = (name, cur) => {
+    if (!name) return null; if (accByName[name]) return accByName[name].id;
+    cur = CUR[cur] ? cur : 'TWD'; const ty = guessType(name, cur);
+    const a = {id:'a_' + hashStr('acc|' + name), name, type:ty, currency:cur, init:0, initRate:null, order:Object.keys(A).length + newAcc.length, color:{cash:'#4F6D7A', bank:'#2E86AB', credit:'#D1495B', epay:'#E8A33C', other:'#888888'}[ty], archived:false};
+    accByName[name] = a; newAcc.push(a); return a.id;
+  };
+  const getCat = (type, main, sub) => {
+    main = main || '其他'; const k = `${type}|${main}|${sub || ''}`; if (catIdx[k]) return catIdx[k];
+    const pk = `${type}|${main}|`; let pid = catIdx[pk];
+    if (!pid) { const ico = (MAIN_ICON.find(([re]) => re.test(main)) || [0, 'more'])[1]; pid = 'c_' + hashStr(pk);
+      newCat.push({id:pid, type, name:main, parent:null, icon:ico, color:PALETTE[(Object.keys(C).length + newCat.length) % PALETTE.length], order:99 + newCat.length, hidden:false}); catIdx[pk] = pid; }
+    if (!sub) return pid;
+    const p = newCat.find(c => c.id === pid) || C[pid], id = 'c_' + hashStr(k);
+    newCat.push({id, type, name:sub, parent:pid, icon:p.icon, color:p.color, order:99 + newCat.length, hidden:false}); catIdx[k] = id; return id;
+  };
+  const getProj = n => { if (!n) return null; if (projByName[n]) return projByName[n].id; const p = {id:'p_' + hashStr('proj|' + n), name:n, createdAt:Date.now(), archived:false, hidden:false}; projByName[n] = p; newProj.push(p); return p.id; };
+  rows.forEach((r, i) => {
+    const type = {'支出':'expense', '收入':'income', '轉帳':'transfer'}[r['類型']], date = (r['日期'] || '').replace(/\//g, '-').replace(/-(\d)(?=-|$)/g, '-0$1');
+    const amt = parseFloat(r['金額']);
+    if (!type || !/^\d{4}-\d\d-\d\d$/.test(date) || !(amt > 0)) { skipped++; return; }
+    const id = r['ID'] || 'x_' + hashStr([date, r['類型'], r['帳戶'], amt, r['備註'], i].join('|'));
+    const old = S.data.txns[id];
+    const t = {id, type, date, amount:amt, accountId:getAcc(r['帳戶'], r['幣別']), projectId:getProj(r['專案']), note:r['備註'] || '', createdAt:old ? old.createdAt : Date.parse(date) + i};
+    if (!t.accountId) { skipped++; return; }
+    if (r['發票號碼']) t.invoice = r['發票號碼'];
+    if (type === 'expense' && parseInt(r['分期期數']) > 1) t.inst = {n:parseInt(r['分期期數']), fee:parseFloat(r['分期手續費']) || 0};
+    if (type === 'transfer') {
+      t.toAccountId = getAcc(r['轉入帳戶'], r['轉入幣別']); if (!t.toAccountId) { skipped++; return; }
+      t.toAmount = parseFloat(r['轉入金額']) || amt; t.fee = parseFloat(r['手續費']) || 0; t.catId = FEE_CAT;
+    } else {
+      t.catId = getCat(type, r['主分類'], r['子分類']);
+      const twv = parseFloat(r['台幣金額']), acc = A[t.accountId] || newAcc.find(a => a.id === t.accountId);
+      if (acc && acc.currency !== 'TWD' && twv > 0) t.rate = twv / amt;
+    }
+    txns.push(t);
+  });
+  return {newAcc, newCat, newProj, txns, skipped};
+}
+function renderMoneyImport(){
+  const b = IMP.b = buildMoneyImport(IMP.rows), ex = b.txns.filter(t => S.data.txns[t.id]).length, d = b.txns.map(t => t.date).sort();
+  const body = `<div class="kv"><div><small>紀錄</small><b>${b.txns.length} 筆</b></div><div><small>期間</small><b class="sm">${d[0] || '-'} ～ ${d[d.length - 1] || '-'}</b></div>
+      <div><small>已存在（會覆蓋）</small><b>${ex} 筆</b></div><div><small>新增帳戶／分類／專案</small><b>${b.newAcc.length}／${b.newCat.length}／${b.newProj.length}</b></div></div>
+    ${b.newAcc.length ? `<div class="cm-subs" style="margin-top:10px">${b.newAcc.map(a => `<span style="padding-right:10px">${esc(a.name)} · ${a.currency}</span>`).join('')}</div>` : ''}
+    ${b.skipped ? `<div class="hint" style="margin:6px 0">略過 ${b.skipped} 列無法辨識的資料</div>` : ''}
+    <button class="btn" style="margin-top:14px" onclick="doMoneyImport()">開始匯入</button>`;
+  return sheet('imp', '匯入 Money CSV', body);
+}
+async function doMoneyImport(){
+  const b = IMP.b; closeLayer('imp'); toast('匯入中…');
+  try { await bulkPut('accounts', b.newAcc); await bulkPut('categories', b.newCat); await bulkPut('projects', b.newProj); await bulkPut('txns', b.txns); render(); toast(`已匯入 ${b.txns.length} 筆`); }
+  catch(e) { toast('匯入失敗：' + (e.code || e.message)); }
+}
+function renderJsonImport(){
+  const j = IMP.json, n = k => Object.keys(j.data[k] || {}).length;
+  const body = `<div class="kv"><div><small>備份時間</small><b class="sm">${esc(new Date(j.exportedAt).toLocaleString('zh-TW'))}</b></div><div><small>紀錄</small><b>${n('txns')} 筆</b></div>
+      <div><small>帳戶／分類／專案</small><b>${n('accounts')}／${n('categories')}／${n('projects')}</b></div><div><small>版本</small><b class="sm">${esc(j.version || '')}</b></div></div>
+    <div class="hint" style="margin:10px 0">同一筆會以備份為準覆蓋；目前有、備份沒有的資料會保留，不會刪除。</div>
+    <button class="btn" onclick="doJsonImport()">還原</button>`;
+  return sheet('imp', '還原備份', body);
+}
+async function doJsonImport(){
+  const j = IMP.json; closeLayer('imp'); toast('還原中…');
+  try {
+    for (const col of COLS) await bulkPut(col, Object.values(j.data[col] || {}).map(o => ({...o})));
+    if (j.settings) { const {carrier, theme, custom, rateOverride} = j.settings; putSettings({carrier:carrier || S.settings.carrier, theme:theme || S.settings.theme, custom:custom || S.settings.custom, rateOverride:rateOverride || {}}); }
+    render(); toast(`已還原 ${Object.keys(j.data.txns || {}).length} 筆`);
+  } catch(e) { toast('還原失敗：' + (e.code || e.message)); }
+}
+
+/* ---------- budget ---------- */
+const mKey = (y, m) => `${y}-${pad(m + 1)}`;
+function hasBudget(){ const B = S.settings.budget; return !!B && (B.total > 0 || Object.values(B.cats || {}).some(v => v > 0)); }
+function spentOf(y, m){
+  const out = {_t:0};
+  for (const f of flowsIn(ds(new Date(y, m, 1)), ds(new Date(y, m, dim(y, m))))) if (f.type === 'expense') { out._t += f.amt; const k = mainId(f.cat); out[k] = (out[k] || 0) + f.amt; }
+  return out;
+}
+function budgetOf(y, m){
+  if (!hasBudget()) return null;
+  const B = S.settings.budget, since = B.since || mKey(y, m), cur = mKey(y, m);
+  if (cur < since) return null;
+  const keys = ['_t', ...Object.keys(B.cats || {}).filter(k => B.cats[k] > 0)], base = k => k === '_t' ? (+B.total || 0) : (+B.cats[k] || 0);
+  const carry = Object.fromEntries(keys.map(k => [k, 0]));
+  if (B.carry) {
+    let [yy, mm] = since.split('-').map(Number); mm--;
+    for (let i = 0; i < 600 && mKey(yy, mm) < cur; i++) {
+      const sp = spentOf(yy, mm);
+      for (const k of keys) if (base(k) > 0) carry[k] += base(k) - (sp[k] || 0);
+      mm++; if (mm > 11) { mm = 0; yy++; }
+    }
+  }
+  const sp = spentOf(y, m), mk = k => { const b = base(k), av = b + carry[k], s = sp[k] || 0; return {base:b, carry:carry[k], avail:av, spent:s, remain:av - s, pct:av > 0 ? s / av : (s > 0 ? 9 : 0)}; };
+  return {total:base('_t') > 0 ? mk('_t') : null, cats:Object.fromEntries(keys.filter(k => k !== '_t').map(k => [k, mk(k)]))};
+}
+function bbar(pct, color){ const p = Math.min(100, pct * 100); return `<div class="pbar" style="height:7px"><i style="width:${p}%;background:${pct >= 1 ? 'var(--exp)' : pct >= .85 ? '#E8A33C' : color || 'var(--acc)'}"></i></div>`; }
+function viewBudget(){
+  const r = S.ui.rp, b = budgetOf(r.y, r.m), nav = `<div class="rbar"><span></span><div class="nav2"><button onclick="S.ui.rp.per='month';rpShift(-1)">${ic('left',20)}</button><span>${r.y} 年 ${r.m + 1} 月</span><button onclick="S.ui.rp.per='month';rpShift(1)">${ic('right',20)}</button></div></div>`;
+  if (!hasBudget()) return `${nav}<div class="card"><p class="mt0">還沒有設定預算</p><button class="btn" onclick="openBudgetEdit()">設定預算</button></div>`;
+  if (!b) return `${nav}<div class="empty">這個月份在預算開始之前</div><div style="margin:0 16px"><button class="btn sec2" onclick="openBudgetEdit()">預算設定</button></div>`;
+  const now = new Date(), isCur = r.y === now.getFullYear() && r.m === now.getMonth(), left = dim(r.y, r.m) - now.getDate() + 1;
+  const T = b.total;
+  const totalCard = T ? `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-end"><div><small class="tx2">本月可用</small><div style="font-size:28px;font-weight:800" class="${T.remain < 0 ? 'exp' : ''}">${twd(T.remain)}</div></div>
+      <div style="text-align:right;font-size:13px;line-height:1.6"><span class="tx2">預算</span> ${twd(T.base)}${S.settings.budget.carry ? `<br><span class="tx2">上月累積</span> <span class="${T.carry < 0 ? 'exp' : 'inc'}">${twd(T.carry, true)}</span>` : ''}<br><span class="tx2">已花</span> <span class="exp">${twd(T.spent)}</span></div></div>
+      ${bbar(T.pct)}${isCur && T.remain > 0 ? `<div class="sm tx2" style="margin-top:8px">剩 ${left} 天，每天可花 ${twd(T.remain / left)}</div>` : ''}</div>` : '';
+  const rows = Object.entries(b.cats).sort((x, y) => y[1].pct - x[1].pct).map(([id, v]) => { const c = S.data.categories[id];
+    return `<button class="row" onclick="openCatRpt('${id}','${ds(new Date(r.y, r.m, 1))}','${ds(new Date(r.y, r.m, dim(r.y, r.m)))}','expense')"><span class="cic" style="background:${c?.color || '#aaa'}">${ic(c?.icon || 'more',20)}</span>
+      <span class="mid"><b>${esc(c?.name || '?')} <span class="tx2 sm" style="font-weight:400">${twd(v.spent)} / ${twd(v.avail)}</span></b>${bbar(v.pct, c?.color)}</span>
+      <span class="amt ${v.remain < 0 ? 'exp' : ''}">${twd(v.remain)}<small>${v.remain < 0 ? '超支' : '剩餘'}</small></span></button>`; }).join('');
+  return `${nav}${totalCard}${rows ? `<div class="sec"><h3>分類預算</h3></div><div class="list">${rows}</div>` : ''}<div style="margin:14px 16px"><button class="btn sec2" onclick="openBudgetEdit()">預算設定</button></div>`;
+}
+let BE = null;
+function openBudgetEdit(){ const B = S.settings.budget || {}; BE = {total:B.total || '', carry:B.carry !== false, cats:{...(B.cats || {})}}; openLayer('bud', renderBudgetEdit, 'btm'); }
+function renderBudgetEdit(){
+  const mains = Object.values(S.data.categories).filter(c => c.type === 'expense' && !c.parent && !c.hidden).sort(byOrder);
+  const avg = id => { const n = new Date(); let s = 0; for (let i = 1; i <= 3; i++) { const d = new Date(n.getFullYear(), n.getMonth() - i, 1); s += spentOf(d.getFullYear(), d.getMonth())[id] || 0; } return s / 3; };
+  const body = `<div class="fld"><label>每月總預算（台幣，留空＝不設）<span style="float:right">近 3 月平均 ${twd(avg('_t'))}</span></label><input inputmode="numeric" value="${esc(BE.total)}" oninput="BE.total=this.value"></div>
+    <div class="tog"><span>沒花完累積到下個月<br><small class="tx2">超支也會從下個月扣</small></span><input type="checkbox" ${BE.carry ? 'checked' : ''} onchange="BE.carry=this.checked"></div>
+    <div class="fld" style="margin-top:10px"><label>分類預算（留空＝不設）</label>
+    ${mains.map(c => `<div class="row" style="padding:6px 0;border:0"><span class="cic" style="background:${c.color};width:32px;height:32px;border-radius:10px">${ic(c.icon,16)}</span><span class="mid"><b>${esc(c.name)}</b><small>近 3 月平均 ${twd(avg(c.id))}</small></span>
+      <input inputmode="numeric" style="width:110px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);text-align:right" value="${esc(BE.cats[c.id] || '')}" oninput="BE.cats['${c.id}']=this.value"></div>`).join('')}</div>
+    <button class="btn" onclick="saveBudget()">儲存</button>`;
+  return sheet('bud', '預算設定', body);
+}
+function saveBudget(){
+  const cats = {}; for (const [k, v] of Object.entries(BE.cats)) if (parseFloat(v) > 0) cats[k] = parseFloat(v);
+  const old = S.settings.budget || {}, total = parseFloat(BE.total) || 0, n = new Date();
+  putSettings({budget:{total, cats, carry:BE.carry, since:old.since || mKey(n.getFullYear(), n.getMonth())}});
+  closeLayer('bud'); toast('預算已儲存');
+}
+
+/* ---------- search ---------- */
+let SR = {q:'', type:'', acc:'', cat:'', proj:'', from:'', to:'', min:'', max:'', limit:100, more:false};
+function openSearch(){ SR.limit = 100; openLayer('search', renderSearch, 'full', el => { const i = el.querySelector('#srq'); if (i && !SR.from) setTimeout(() => i.focus(), 50); srUpdate(); }); }
+function renderSearch(){
+  const C = S.data.categories, mains = Object.values(C).filter(c => !c.parent && !c.hidden).sort((a, b) => a.type < b.type ? -1 : a.type > b.type ? 1 : byOrder(a, b));
+  const sel = (k, opts) => `<select onchange="SR.${k}=this.value;SR.limit=100;srUpdate()" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--card)">${opts}</select>`;
+  const o = (v, l, k) => `<option value="${v}" ${SR[k] === v ? 'selected' : ''}>${esc(l)}</option>`;
+  const inp = (k, ph, t = 'text') => `<input type="${t}" ${t === 'text' ? 'inputmode="decimal"' : ''} placeholder="${ph}" value="${esc(SR[k])}" oninput="SR.${k}=this.value;SR.limit=100;srUpdate()" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--card)">`;
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('search')">${ic('left',24)}</button>
+      <input id="srq" type="search" placeholder="搜尋備註、分類、帳戶、金額" value="${esc(SR.q)}" oninput="SR.q=this.value;SR.limit=100;srUpdate()" style="flex:1;border:0;background:var(--card);border-radius:12px;padding:10px 12px;outline:none;box-shadow:var(--sh)">
+      <button class="ib ${SR.more ? 'on' : ''}" onclick="SR.more=!SR.more;redraw('search');srUpdate()">${ic('sort',20)}</button></div>
+    <div style="display:flex;gap:6px;margin:0 16px 6px">${sel('type', o('', '全部類型', 'type') + o('expense', '支出', 'type') + o('income', '收入', 'type') + o('transfer', '轉帳', 'type'))}
+      ${sel('acc', o('', '全部帳戶', 'acc') + accList(true).map(a => o(a.id, a.name, 'acc')).join(''))}</div>
+    ${SR.more ? `<div style="display:flex;gap:6px;margin:0 16px 6px">${sel('cat', o('', '全部分類', 'cat') + mains.map(m => o(m.id, (m.type === 'income' ? '收入：' : '') + m.name, 'cat') + Object.values(C).filter(c => c.parent === m.id && !c.hidden).sort(byOrder).map(c => o(c.id, '　' + c.name, 'cat')).join('')).join(''))}
+      ${sel('proj', o('', '全部專案', 'proj') + Object.values(S.data.projects).filter(p => !p.hidden).map(p => o(p.id, p.name, 'proj')).join(''))}</div>
+    <div style="display:flex;gap:6px;margin:0 16px 6px;align-items:center">${inp('from', '', 'date')}<span class="tx2">～</span>${inp('to', '', 'date')}</div>
+    <div style="display:flex;gap:6px;margin:0 16px 6px;align-items:center">${inp('min', '最小金額')}<span class="tx2">～</span>${inp('max', '最大金額')}<button class="tx2 sm" style="flex:none;padding:0 6px" onclick="SR={...SR,type:'',acc:'',cat:'',proj:'',from:'',to:'',min:'',max:''};redraw('search');srUpdate()">清除</button></div>` : ''}
+    <div class="fscroll" id="srres"></div></div>`;
+}
+function srMatch(){
+  const C = S.data.categories, A = S.data.accounts, Pj = S.data.projects;
+  const words = SR.q.trim().toLowerCase().split(/\s+/).filter(Boolean), mn = parseFloat(SR.min), mx = parseFloat(SR.max);
+  return compute().list.filter(t => {
+    if (SR.type && t.type !== SR.type) return false;
+    if (SR.acc && t.accountId !== SR.acc && t.toAccountId !== SR.acc) return false;
+    if (SR.cat && !inCatId(t.catId, SR.cat)) return false;
+    if (SR.proj && t.projectId !== SR.proj) return false;
+    if (SR.from && t.date < SR.from) return false;
+    if (SR.to && t.date > SR.to) return false;
+    if (!isNaN(mn) && t.amount < mn) return false;
+    if (!isNaN(mx) && t.amount > mx) return false;
+    if (!words.length) return true;
+    const c = C[t.catId], m = c && c.parent ? C[c.parent] : null;
+    const hay = [t.note, t.type === 'transfer' ? '轉帳' : c?.name, m?.name, A[t.accountId]?.name, A[t.toAccountId]?.name, Pj[t.projectId]?.name, String(t.amount), t.invoice, t.date].join(' ').toLowerCase();
+    return words.every(w => hay.includes(w));
+  }).reverse();
+}
+function srUpdate(){
+  const el = document.getElementById('srres'); if (!el) return;
+  const any = SR.q.trim() || SR.type || SR.acc || SR.cat || SR.proj || SR.from || SR.to || SR.min || SR.max;
+  if (!any) { el.innerHTML = '<div class="empty">輸入關鍵字，或按右上角開啟更多篩選<br><small>多個關鍵字用空白分開</small></div>'; return; }
+  const res = srMatch(), tw = compute().tw; let e = 0, i = 0;
+  for (const t of res) { if (t.type === 'expense') e += tw[t.id].amt + tw[t.id].fee; else if (t.type === 'income') i += tw[t.id].amt; else e += tw[t.id].fee; }
+  el.innerHTML = `<div class="sec" style="margin-top:6px"><h3>${res.length} 筆</h3><span class="sm"><span class="exp">${twd(-e)}</span>　<span class="inc">${twd(i, true)}</span></span></div>
+    <div class="list">${res.length ? res.slice(0, SR.limit).map(t => txnRow(t, null, true)).join('') : '<div class="empty">找不到符合的紀錄</div>'}</div>
+    ${res.length > SR.limit ? `<div style="margin:12px 16px"><button class="btn sec2" onclick="SR.limit+=200;srUpdate()">顯示更多（還有 ${res.length - SR.limit} 筆）</button></div>` : ''}<div style="height:30px"></div>`;
+}
+
+/* ---------- PIN lock ---------- */
+async function pinHash(p){
+  try { const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('money|' + p)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+  catch(e) { return 'h' + hashStr('money|' + p); }
+}
+let LOCKED = false, LOCK_PENDING = false, PIN_IN = '', hiddenAt = 0;
+function lockNow(){ if (!P.pin) return; if (S.ui.tab === 'carrier' && !LAYERS.length) { LOCK_PENDING = true; return; } LOCKED = true; PIN_IN = ''; drawLock(); }
+function drawLock(){
+  let el = document.getElementById('lock');
+  if (!LOCKED) { el && el.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.id = 'lock'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="lk"><div class="brand" style="font-size:16px">MONEY</div><div style="margin:14px 0 18px">${ic('lock',28)}</div><div class="dots4">${[0, 1, 2, 3].map(i => `<i class="${i < PIN_IN.length ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="lkp">${['1','2','3','4','5','6','7','8','9','','0','⌫'].map(k => k ? `<button onclick="pinKey('${k}')">${k === '⌫' ? ic('back',22) : k}</button>` : '<span></span>').join('')}</div>
+    <button class="tx2 sm" style="margin-top:18px" onclick="forgotPin()">忘記密碼</button></div>`;
+}
+async function pinKey(k){
+  if (k === '⌫') PIN_IN = PIN_IN.slice(0, -1); else if (PIN_IN.length < 4) PIN_IN += k;
+  drawLock();
+  if (PIN_IN.length === 4) {
+    if (await pinHash(PIN_IN) === P.pin) { LOCKED = false; drawLock(); }
+    else { PIN_IN = ''; const d = document.querySelector('#lock .dots4'); d && d.classList.add('shake'); setTimeout(drawLock, 400); }
+  }
+}
+function forgotPin(){
+  if (S.mode === 'cloud') { if (!confirm('要登出並重新登入才能清除密碼，確定？')) return; P.pin = null; savePrefs(); LOCKED = false; drawLock(); auth.signOut(); }
+  else { if (!confirm('清除密碼鎖？（資料會保留）')) return; P.pin = null; savePrefs(); LOCKED = false; drawLock(); render(); }
+}
+async function setPin(){
+  if (P.pin) {
+    const o = prompt('輸入目前的 4 位數密碼'); if (o === null) return;
+    if (await pinHash(o) !== P.pin) return toast('密碼錯誤');
+    if (confirm('關閉密碼鎖？（按取消改為變更密碼）')) { P.pin = null; savePrefs(); render(); return toast('已關閉密碼鎖'); }
+  }
+  const a = prompt('設定 4 位數密碼'); if (a === null) return; if (!/^\d{4}$/.test(a)) return toast('請輸入 4 位數字');
+  const b = prompt('再輸入一次'); if (b !== a) return toast('兩次不一樣');
+  P.pin = await pinHash(a); savePrefs(); render(); toast('已開啟密碼鎖');
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  if (P.pin && !LOCKED && hiddenAt && Date.now() - hiddenAt >= (+P.lockAfter || 0) * 60000) lockNow();
+});
+
+/* ---------- backup reminder ---------- */
+function backupAlert(){
+  const n = Object.keys(S.data.txns).length; if (n < 20) return '';
+  if (!P.firstUse) { P.firstUse = Date.now(); savePrefs(); }
+  const last = P.lastBackup || P.firstUse, days = Math.floor((Date.now() - last) / 864e5);
+  if (days < 30 || Date.now() < (P.backupSnooze || 0)) return '';
+  return `<div class="alert" style="justify-content:space-between"><span style="display:flex;gap:8px;align-items:center">${ic('folder',18)}<span>${P.lastBackup ? `已 ${days} 天沒備份` : '還沒備份過'}</span></span>
+    <span style="display:flex;gap:10px;flex:none"><button class="b" style="color:var(--acc)" onclick="exportJSON()">備份</button><button class="tx2" onclick="P.backupSnooze=Date.now()+7*864e5;savePrefs();render()">稍後</button></span></div>`;
+}
+
+/* ---------- carrier ---------- */
+function viewCarrier(){
+  const code = S.settings.carrier || P.carrier;
+  return `<div class="top"><button class="ib" onclick="go('home')">${ic('left',24)}</button><h1 style="flex:1">手機條碼載具</h1>${code ? `<button class="ib" onclick="editCarrier()">${ic('edit',22)}</button>` : ''}</div>
+    ${code ? `<div class="bc"><svg id="bcsvg"></svg><div class="code">${esc(code)}</div></div>
+      <div style="margin:0 16px"><button class="btn" style="padding:16px;font-size:17px" onclick="openAdd()">＋ 記一筆</button></div>
+      <div class="hint">・結帳時給店員掃描，螢幕調到最亮比較好掃<br>・掃完直接按「記一筆」<br>・桌面直達：開啟網址後面加 carrier.html 的頁面，按「分享 → 加入主畫面」</div>`
+    : `<div class="card"><p class="mt0">輸入你的手機條碼（/ 開頭共 8 碼）</p><div class="fld"><input id="cin" placeholder="/ABC1234" autocapitalize="characters" style="font-size:20px;letter-spacing:3px"></div><button class="btn" onclick="saveCarrier($('#cin').value)">儲存</button></div>`}`;
+}
+function drawBarcode(){
+  const code = S.settings.carrier || P.carrier, el = $('#bcsvg'); if (!code || !el) return;
+  if (typeof JsBarcode === 'undefined') { el.outerHTML = '<div class="tx2">條碼元件載入失敗，請連網後重開</div>'; return; }
+  JsBarcode(el, code, {format:'CODE39', width:2.4, height:110, displayValue:false, margin:12, background:'#ffffff', lineColor:'#000000'});
+}
+function saveCarrier(v){
+  v = (v || '').trim().toUpperCase();
+  if (!/^\/[0-9A-Z.+\-]{7}$/.test(v)) return toast('格式：/ 開頭，後面 7 碼英數');
+  putSettings({carrier:v}); toast('已儲存');
+}
+function editCarrier(){ const v = prompt('手機條碼', S.settings.carrier || P.carrier); if (v !== null) saveCarrier(v); }
+
+/* ---------- settings ---------- */
+function viewSettings(){
+  const th = S.settings.theme, cu = S.settings.custom || {};
+  const used = [...new Set(accList(true).map(a => a.currency).filter(c => c !== 'TWD'))];
+  const rateRows = (used.length ? used : ['JPY']).map(c => `<div class="row"><span class="mid"><b>${c} ${CUR[c]?.name || ''}</b><small>即時 ${(RATES.r[c] || FALLBACK_RATE[c] || 0).toFixed(4)}${S.settings.rateOverride?.[c] ? ' · 使用自訂' : ''}</small></span>
+      <input inputmode="decimal" style="width:100px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);text-align:right" placeholder="自訂" value="${esc(S.settings.rateOverride?.[c] || '')}" onchange="setOverride('${c}',this.value)"></div>`).join('');
+  return `<div class="top"><h1>設定</h1></div>
+    <div class="grp"><span>同步</span></div>
+    <div class="list set">${S.mode === 'cloud'
+      ? `<div class="row"><span class="mid"><b>${esc(S.user?.email || '')}</b><small>雲端同步中 · 換手機登入即可取回資料</small></span><button style="color:var(--exp)" onclick="logout()">登出</button></div>`
+      : `<div class="row"><span class="mid"><b>本機模式</b><small>資料只存在這支手機的瀏覽器，設定 Firebase 後可跨裝置同步</small></span></div>`}</div>
+    <div class="grp"><span>外觀</span></div>
+    <div class="card mt0" style="margin-top:0"><div class="thm">${Object.entries(THEMES).map(([k, v]) => `<button class="${th === k ? 'on' : ''}" onclick="putSettings({theme:'${k}'})"><div class="dots"><i style="background:${v.pri}"></i><i style="background:${v.acc}"></i></div>${v.name}</button>`).join('')}
+      </div>
+      <div class="tog" style="margin-top:10px"><span>自訂配色</span><span style="display:flex;gap:8px;align-items:center">
+        <input type="color" value="${cu.pri || '#C0707C'}" onchange="putSettings({theme:'custom',custom:{...S.settings.custom,pri:this.value}})" style="width:36px;height:32px;border:0;background:none">
+        <input type="color" value="${cu.acc || '#2A8378'}" onchange="putSettings({theme:'custom',custom:{...S.settings.custom,acc:this.value}})" style="width:36px;height:32px;border:0;background:none">
+        ${th === 'custom' ? '<b style="color:var(--pri);font-size:12px">使用中</b>' : ''}</span></div>
+      <div class="tog"><span>深淺色</span><div class="seg">${[['time','依時間'],['auto','跟系統'],['light','淺'],['dark','深']].map(([k, l]) => `<button class="${P.mode === k ? 'on' : ''}" onclick="P.mode='${k}';savePrefs();applyTheme();render()">${l}</button>`).join('')}</div></div>
+      ${P.mode === 'time' ? `<div class="tog"><span>深色時段</span><span style="display:flex;gap:6px;align-items:center">
+        <input type="time" value="${P.darkFrom}" onchange="P.darkFrom=this.value||'22:00';savePrefs();applyTheme();render()" style="border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)">～
+        <input type="time" value="${P.darkTo}" onchange="P.darkTo=this.value||'08:00';savePrefs();applyTheme();render()" style="border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)"></span></div>` : ''}</div>
+    <div class="grp"><span>使用習慣</span></div>
+    <div class="list set"><div class="row"><span class="mid"><b>離開後回到首頁今天</b><small>正在記帳且已輸入的內容會保留</small></span><select onchange="P.dockAfter=+this.value;savePrefs()" style="border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)">${[[0,'立即'],[30,'30 秒後'],[60,'1 分鐘後'],[300,'5 分鐘後'],[999999,'不要']].map(([v, l]) => `<option value="${v}" ${(+P.dockAfter || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
+    <div class="grp"><span>安全</span></div>
+    <div class="list set"><button class="row" onclick="setPin()"><span class="mid"><b>密碼鎖</b><small>${P.pin ? '已開啟 · 點此變更或關閉' : '開 App 時要輸入 4 位數密碼'}</small></span>${ic('right',18)}</button>
+      ${P.pin ? `<div class="row"><span class="mid"><b>離開多久後上鎖</b></span><select onchange="P.lockAfter=+this.value;savePrefs()" style="border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)">${[[0,'立即'],[1,'1 分鐘'],[5,'5 分鐘'],[15,'15 分鐘']].map(([v, l]) => `<option value="${v}" ${(+P.lockAfter || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : ''}</div>
+    <div class="grp"><span>資料</span></div>
+    <div class="list set">
+      <button class="row" onclick="S.ui.rp.seg='budget';go('reports')"><span class="mid"><b>預算</b><small>${hasBudget() ? '已設定' : '未設定'}</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="openRules()"><span class="mid"><b>固定收支</b><small>${Object.values(S.data.recurring || {}).filter(r => r.active !== false).length} 個進行中</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="openTplMgr()"><span class="mid"><b>常用範本</b><small>${tplList().length} 個</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="openCatMgr()"><span class="mid"><b>分類管理</b><small>新增、改名、刪除</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="openProjMgr()"><span class="mid"><b>專案管理</b><small>${Object.values(S.data.projects).filter(p => !p.hidden).length} 個專案</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="editCarrier()"><span class="mid"><b>手機條碼載具</b><small>${esc(S.settings.carrier || P.carrier || '未設定')}</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="openExport()"><span class="mid"><b>匯出 CSV／完整備份</b><small>CSV 可用 Excel 開；備份檔可匯回</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="pickImport()"><span class="mid"><b>匯入</b><small>CMoney CSV、Money CSV、備份檔；同一筆不會重複</small></span>${ic('right',18)}</button></div>
+    <div class="grp"><span>匯率（1 外幣 = ? 台幣）</span><button style="color:var(--acc);display:flex;gap:4px;align-items:center" onclick="refreshRates(true)">${ic('refresh',16)}更新</button></div>
+    <div class="list set">${rateRows}</div>
+    <div class="hint">${RATES.at ? '即時匯率更新於 ' + new Date(RATES.at).toLocaleString('zh-TW') : '尚未取得即時匯率，使用預設值'}。帳戶資產用即時匯率；收支報表用你換匯時的實際匯率。</div>
+    <div class="hint" style="text-align:center;margin-top:20px">Money ${VERSION}</div>`;
+}
+function setOverride(c, v){ const o = {...(S.settings.rateOverride || {})}; if (parseFloat(v) > 0) o[c] = parseFloat(v); else delete o[c]; bump(); putSettings({rateOverride:o}); }
+
+/* category manager */
+let CM = {type:'expense', adding:null};
+function openCatMgr(){ CM = {type:'expense', adding:null}; openLayer('cm', renderCatMgr, 'full', mountCatSort); }
+function mountCatSort(el){
+  if (typeof Sortable === 'undefined') return;
+  const opt = {animation:150, ghostClass:'ghost-sortable', delay:180, delayOnTouchOnly:true};
+  const list = el.querySelector('#cmlist');
+  if (list) Sortable.create(list, {...opt, handle:'.cm-grip', onEnd(){ saveOrder([...list.children].map(x => x.dataset.id)); }});
+  el.querySelectorAll('.cm-subs').forEach(box => Sortable.create(box, {...opt, group:'subs', draggable:'.sb', filter:'.addchip',
+    onEnd(e){
+      const ids = new Set();
+      for (const b of new Set([e.from, e.to])) {
+        const pid = b.dataset.pid, P0 = S.data.categories[pid];
+        [...b.querySelectorAll('.sb')].forEach((x, i) => { const c = S.data.categories[x.dataset.id]; if (!c) return;
+          if (c.order !== i || c.parent !== pid) { Object.assign(c, {order:i, parent:pid, icon:P0.icon, color:P0.color}); ids.add(c.id); } });
+      }
+      if (ids.size) bulkPut('categories', [...ids].map(id => S.data.categories[id])).then(() => { render(); if (e.from !== e.to) toast('已移到「' + S.data.categories[e.to.dataset.pid].name + '」'); });
+    }}));
+}
+function saveOrder(ids){
+  const ch = []; ids.forEach((id, i) => { const c = S.data.categories[id]; if (c && c.order !== i) { c.order = i; ch.push(c); } });
+  if (ch.length) bulkPut('categories', ch).then(() => render());
+}
+function sortCatsByUse(){
+  if (!confirm('依過去一年的使用次數重新排序（主分類和子分類都會排）？')) return;
+  const since = ds(new Date(Date.now() - 365 * 864e5)), cnt = {};
+  for (const t of Object.values(S.data.txns)) if (t.date >= since) { cnt[t.catId] = (cnt[t.catId] || 0) + 1; const c = S.data.categories[t.catId]; if (c?.parent) cnt[c.parent] = (cnt[c.parent] || 0) + 1; }
+  const all = Object.values(S.data.categories).filter(c => c.type === CM.type && !c.hidden), by = (a, b) => (cnt[b.id] || 0) - (cnt[a.id] || 0) || byOrder(a, b), ch = [];
+  const apply = arr => arr.sort(by).forEach((c, i) => { if (c.order !== i) { c.order = i; ch.push(c); } });
+  apply(all.filter(c => !c.parent)); for (const m of all.filter(c => !c.parent)) apply(all.filter(c => c.parent === m.id));
+  bulkPut('categories', ch).then(() => { redraw('cm'); render(); toast('已依常用程度排序'); });
+}
+function renderCatMgr(){
+  const all = Object.values(S.data.categories).filter(c => c.type === CM.type && !c.hidden);
+  const mains = all.filter(c => !c.parent).sort(byOrder);
+  const ad = CM.adding;
+  const addForm = ad ? `<div class="card" style="margin:0 0 12px"><div class="fld"><label>主分類名稱</label><input value="${esc(ad.name)}" oninput="CM.adding.name=this.value"></div>
+      <div class="fld"><label>圖示</label><div class="igrid">${CAT_ICONS.map(i => `<button class="${ad.icon === i ? 'on' : ''}" onclick="CM.adding.icon='${i}';redraw('cm')">${ic(i,18)}</button>`).join('')}</div></div>
+      <div class="fld"><label>顏色</label><div class="sw">${PALETTE.map(p => `<button style="background:${p}" class="${ad.color === p ? 'on' : ''}" onclick="CM.adding.color='${p}';redraw('cm')"></button>`).join('')}</div></div>
+      <div class="two"><button class="btn sec2" onclick="CM.adding=null;redraw('cm')">取消</button><button class="btn" onclick="saveMain()">儲存</button></div></div>` : '';
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('cm')">${ic('left',24)}</button><h2>分類管理</h2><span style="width:40px"></span></div>
+    <div style="display:flex;justify-content:center;margin-bottom:8px"><div class="seg"><button class="${CM.type === 'expense' ? 'on' : ''}" onclick="CM.type='expense';CM.adding=null;redraw('cm')">支出</button><button class="${CM.type === 'income' ? 'on' : ''}" onclick="CM.type='income';CM.adding=null;redraw('cm')">收入</button></div></div>
+    <div class="fscroll" style="padding:0 16px 30px">${addForm}
+    <button class="btn sec2" style="margin-bottom:10px;padding:10px" onclick="sortCatsByUse()">依常用程度自動排序</button>
+    <div id="cmlist">${mains.map(m => { const subs = all.filter(c => c.parent === m.id).sort(byOrder); return `<div class="cm-main" data-id="${m.id}"><div class="cm-h"><span class="cm-grip tx2" style="cursor:grab;touch-action:none;padding:4px">${ic('grip',20)}</span><span class="cic" style="background:${m.color};width:34px;height:34px;border-radius:11px">${ic(m.icon,18)}</span><b>${esc(m.name)}</b>
+        <button class="mini" onclick="editMain('${m.id}')">${ic('edit',18)}</button><button class="mini" onclick="hideCat('${m.id}')">${ic('trash',18)}</button></div>
+        <div class="cm-subs" data-pid="${m.id}">${subs.map(s => `<span class="sb" data-id="${s.id}"><b style="font-weight:500" onclick="renameCat('${s.id}')">${esc(s.name)}</b><button onclick="hideCat('${s.id}')">${ic('x',14)}</button></span>`).join('')}<span class="addchip" onclick="addSub('${m.id}')" style="padding-right:10px">＋ 子分類</span></div></div>`; }).join('')}</div>
+    ${ad ? '' : `<button class="btn sec2" onclick="CM.adding={name:'',icon:'more',color:PALETTE[0]};redraw('cm');document.querySelector('.layer:last-child .fscroll').scrollTop=0">＋ 新增主分類</button>`}
+    <div class="hint" style="margin:12px 4px">・主分類：按住左邊 ⋮⋮ 上下拖曳排序<br>・子分類：按住約半秒後拖曳，可排序，也能拖到別的主分類底下（舊紀錄會跟著移過去）<br>・點子分類名稱可改名。刪除只是隱藏，舊紀錄仍保留原分類。</div></div></div>`;
+}
+function saveMain(){
+  const ad = CM.adding; if (!ad.name.trim()) return toast('請輸入名稱');
+  if (ad.id) { const c = S.data.categories[ad.id]; Object.assign(c, {name:ad.name.trim(), icon:ad.icon, color:ad.color}); put('categories', c, true);
+    Object.values(S.data.categories).filter(s => s.parent === c.id).forEach(s => { s.icon = c.icon; s.color = c.color; put('categories', s, true); }); }
+  else { const n = Object.values(S.data.categories).filter(c => c.type === CM.type && !c.parent).length; put('categories', {id:'c_' + uid(), type:CM.type, name:ad.name.trim(), icon:ad.icon, color:ad.color, parent:null, order:n, hidden:false}, true); }
+  CM.adding = null; redraw('cm'); render();
+}
+function editMain(id){ const c = S.data.categories[id]; CM.adding = {id, name:c.name, icon:c.icon, color:c.color}; redraw('cm'); }
+function addSub(pid){ const n = prompt('子分類名稱'); if (!n || !n.trim()) return; const p = S.data.categories[pid]; const k = Object.values(S.data.categories).filter(c => c.parent === pid).length; put('categories', {id:'c_' + uid(), type:p.type, name:n.trim(), icon:p.icon, color:p.color, parent:pid, order:k, hidden:false}, true); redraw('cm'); }
+function renameCat(id){ const c = S.data.categories[id]; const n = prompt('改名', c.name); if (!n || !n.trim()) return; c.name = n.trim(); put('categories', c, true); redraw('cm'); }
+function hideCat(id){
+  const c = S.data.categories[id]; if (id === FEE_CAT) return toast('手續費分類是系統用的，不能刪');
+  if (!confirm(`刪除「${c.name}」${c.parent ? '' : '（含子分類）'}？`)) return;
+  c.hidden = true; put('categories', c, true);
+  if (!c.parent) Object.values(S.data.categories).filter(s => s.parent === id && s.id !== FEE_CAT).forEach(s => { s.hidden = true; put('categories', s, true); });
+  redraw('cm');
+}
+
+/* project manager */
+function openProjMgr(){ openLayer('pm', renderProjMgr, 'full'); }
+function renderProjMgr(){
+  const c = compute();
+  const ps = Object.values(S.data.projects).filter(p => !p.hidden).sort((a, b) => (a.archived - b.archived) || (b.createdAt || 0) - (a.createdAt || 0));
+  const tot = id => { let e = 0, i = 0; for (const f of c.flows) if (f.proj === id) { if (f.type === 'expense') e += f.amt; else i += f.amt; } return {e, i}; };
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('pm')">${ic('left',24)}</button><h2>專案</h2><button class="ib" onclick="newProj()">${ic('plus',24)}</button></div>
+    <div class="fscroll"><div class="list">${ps.length ? ps.map(p => { const s = tot(p.id); return `<div class="row"><span class="cic" style="background:${p.archived ? 'var(--tx2)' : 'var(--acc)'}">${ic('folder',20)}</span>
+      <span class="mid"><b>${esc(p.name)}${p.archived ? '（已結束）' : ''}</b><small>支出 ${twd(s.e)}${s.i ? ' · 收入 ' + twd(s.i) : ''}</small></span>
+      <button class="mini" onclick="projMenu('${p.id}')">${ic('edit',18)}</button></div>`; }).join('') : '<div class="empty">還沒有專案<br>記帳時也可以直接新增</div>'}</div>
+    <div class="hint">專案用來單獨統計一件事花多少，例如一趟旅行。結束的專案不會出現在記帳選單。</div></div></div>`;
+}
+function newProj(){ const n = prompt('專案名稱'); if (n && n.trim()) { put('projects', {id:'p_' + uid(), name:n.trim(), createdAt:Date.now(), archived:false, hidden:false}, true); redraw('pm'); } }
+function projMenu(id){
+  const p = S.data.projects[id];
+  const a = prompt(`「${p.name}」\n輸入 1 改名、2 ${p.archived ? '重新啟用' : '標記結束'}、3 刪除`);
+  if (a === '1') { const n = prompt('新名稱', p.name); if (n && n.trim()) p.name = n.trim(); }
+  else if (a === '2') p.archived = !p.archived;
+  else if (a === '3') { if (!confirm('刪除專案？紀錄會保留但不再屬於此專案')) return; p.hidden = true; }
+  else return;
+  put('projects', p, true); redraw('pm');
+}
+
+/* ---------- rates ---------- */
+async function refreshRates(force){
+  if (!force && Date.now() - (RATES.at || 0) < 6 * 3600e3) return;
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/TWD'); const j = await r.json();
+    if (j.result !== 'success') throw 0;
+    const out = {}; for (const c of Object.keys(CUR)) if (c !== 'TWD' && j.rates[c]) out[c] = 1 / j.rates[c];
+    RATES = {at:Date.now(), r:out}; localStorage.setItem(RATE_KEY, JSON.stringify(RATES)); bump(); render();
+    if (force) toast('匯率已更新');
+  } catch(e) { if (force) toast('匯率更新失敗，請確認網路'); }
+}
+
+/* ---------- cloud ---------- */
+function renderLogin(){
+  $('#app').innerHTML = `<div class="login"><h1>Money</h1><p class="tx2" style="margin:0 0 28px">登入後所有裝置同步</p>
+    <div class="fld"><label>Email</label><input id="em" type="email" autocomplete="email"></div>
+    <div class="fld"><label>密碼（至少 6 碼）</label><input id="pw" type="password" autocomplete="current-password"></div>
+    <button class="btn" onclick="doLogin(false)">登入</button>
+    <button class="btn sec2" style="margin-top:10px" onclick="doLogin(true)">第一次使用，建立帳號</button>
+    <button style="display:block;margin:18px auto 0;color:var(--tx2);font-size:13px" onclick="resetPw()">忘記密碼</button></div>`;
+}
+async function doLogin(isNew){
+  const e = $('#em').value.trim(), p = $('#pw').value;
+  if (!e || p.length < 6) return toast('請輸入 Email 與 6 碼以上密碼');
+  try { isNew ? await auth.createUserWithEmailAndPassword(e, p) : await auth.signInWithEmailAndPassword(e, p); }
+  catch(err) { toast({'auth/invalid-credential':'帳號或密碼錯誤','auth/wrong-password':'密碼錯誤','auth/user-not-found':'沒有這個帳號','auth/email-already-in-use':'這個 Email 已註冊，請直接登入','auth/invalid-email':'Email 格式錯誤'}[err.code] || err.code); }
+}
+async function resetPw(){ const e = $('#em').value.trim(); if (!e) return toast('先輸入 Email'); try { await auth.sendPasswordResetEmail(e); toast('重設信已寄出'); } catch(err) { toast(err.code); } }
+function logout(){ if (!confirm('登出？')) return; unsubs.forEach(u => u()); unsubs = []; auth.signOut(); }
+async function batchWrite(lref, data){
+  const ops = [];
+  const now = Date.now();
+  for (const col of COLS) for (const o of Object.values(data[col] || {})) ops.push([col, {...o, updatedAt:o.updatedAt || now}]);
+  for (let i = 0; i < ops.length; i += 400) {
+    const b = db.batch(); ops.slice(i, i + 400).forEach(([col, o]) => b.set(lref.collection(col).doc(o.id), o)); await b.commit();
+  }
+}
+async function attachLedger(u){
+  S.ready = false; render();
+  const uref = db.collection('users').doc(u.uid);
+  const snap = await uref.get();
+  let lid = snap.exists ? snap.data().ledgerId : null;
+  if (!lid) {
+    lid = 'l_' + uid();
+    const lref = db.collection('ledgers').doc(lid);
+    await lref.set({name:'我的帳本', owner:u.uid, members:[u.uid], createdAt:Date.now()});
+    const local = readLocal();
+    const hasLocal = local && Object.keys(local.data?.txns || {}).length;
+    const seed = hasLocal && confirm('這支手機有本機模式的資料，要上傳到雲端帳本嗎？') ? local.data : defaultData();
+    await batchWrite(lref, seed);
+    if (hasLocal && seed === local.data && local.settings) await lref.collection('meta').doc('settings').set(local.settings);
+    await uref.set({ledgerId:lid});
+  }
+  S.ledgerId = lid; ledgerRef = db.collection('ledgers').doc(lid);
+  let pending = COLS.length + 1; const done = () => { if (--pending === 0) { S.ready = true; render(); afterReady(); } };
+  let rt; const sched = () => { clearTimeout(rt); rt = setTimeout(() => { bump(); if (S.ready) render(); }, 60); };
+  // 先讀手機裡的快取（不計費），再只向雲端要「有變動」的資料，省讀取額度
+  for (const col of COLS) {
+    const cached = {}; let maxU = 0;
+    try { const qs = await ledgerRef.collection(col).get({source:'cache'}); qs.forEach(d => { const o = d.data(); maxU = Math.max(maxU, +o.updatedAt || 0); if (!o.deleted) cached[d.id] = o; }); } catch(e) {}
+    S.data[col] = cached;
+    const q = maxU ? ledgerRef.collection(col).where('updatedAt', '>', maxU - 600000) : ledgerRef.collection(col);
+    let first = true;
+    unsubs.push(q.onSnapshot(qs => {
+      qs.docChanges().forEach(ch => { if (ch.type === 'removed') return; const o = ch.doc.data(); if (o.deleted) delete S.data[col][ch.doc.id]; else S.data[col][ch.doc.id] = o; });
+      sched(); if (first) { first = false; done(); }
+    }, e => { toast('讀取失敗：' + e.code); if (first) { first = false; done(); } }));
+  }
+  let firstS = true;
+  unsubs.push(ledgerRef.collection('meta').doc('settings').onSnapshot(d => { if (d.exists) { S.settings = {...S.settings, ...d.data()}; if (S.settings.carrier) { P.carrier = S.settings.carrier; savePrefs(); } applyTheme(); sched(); } if (firstS) { firstS = false; done(); } }));
+}
+
+/* ---------- boot ---------- */
+function afterReady(){
+  if (location.hash === '#add') { history.replaceState(null, '', location.pathname + location.search); openAdd(); }
+  else if (location.hash === '#search') { history.replaceState(null, '', location.pathname + location.search); openSearch(); }
+}
+function openTplMgr(){ F = blankF(); openTpl(); }
+function boot(){
+  if (location.hash === '#carrier') S.ui.tab = 'carrier';
+  if (P.pin) lockNow();
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (FIREBASE_CONFIG && typeof firebase === 'undefined') {
+    $('#app').innerHTML = `<div class="login"><h1>Money</h1><p>無法載入雲端元件，請確認網路後重新開啟。</p><button class="btn" onclick="location.reload()">重新載入</button></div>`; return;
+  }
+  if (FIREBASE_CONFIG) {
+    S.mode = 'cloud';
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
+    db.enablePersistence({synchronizeTabs:true}).catch(() => {});
+    auth = firebase.auth();
+    applyTheme(); render();
+    auth.onAuthStateChanged(u => {
+      S.user = u;
+      if (!u) { S.ready = false; ledgerRef = null; S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}}; render(); return; }
+      attachLedger(u).catch(e => { toast('連線失敗：' + (e.code || e.message)); });
+    });
+  } else {
+    S.mode = 'local';
+    const l = readLocal();
+    if (l && l.data) { S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, ...l.data}; S.settings = {...S.settings, ...(l.settings || {})}; }
+    else { S.data = defaultData(); saveLocal(); }
+    if (!S.settings.carrier && P.carrier) S.settings.carrier = P.carrier;
+    S.ready = true; bump(); applyTheme(); render(); afterReady();
+  }
+  refreshRates();
+}
+/* 返回：Android 返回鍵／手勢、瀏覽器上一頁、iPhone 主畫面 App 從左邊緣右滑 */
+function canGoBack(){ return !LOCKED && (LAYERS.length > 0 || S.ui.tab !== 'home'); }
+function goBack(){
+  if (LOCKED) return false;
+  if (LAYERS.length) {
+    const top = LAYERS[LAYERS.length - 1];
+    if (top.key === 'add' && hasDraft() && !confirm('放棄這筆還沒存的紀錄？')) return true;
+    if (top.key === 'cm' && CM.adding) { CM.adding = null; redraw('cm'); return true; }
+    closeLayer(top.key); return true;
+  }
+  if (S.ui.tab === 'acct') { go('accounts'); return true; }
+  if (S.ui.tab !== 'home') { go('home'); return true; }
+  return false;
+}
+try { history.replaceState({base:1}, ''); history.pushState({guard:1}, ''); } catch(e) {}
+addEventListener('popstate', () => {
+  if (canGoBack()) { goBack(); try { history.pushState({guard:1}, ''); } catch(e) {} }
+  else if (LOCKED) { try { history.pushState({guard:1}, ''); } catch(e) {} }
+  else history.back();
+});
+(function(){
+  if (navigator.standalone !== true) return;   // 只有 iPhone 主畫面 App 需要自己做手勢；瀏覽器與 Android 用系統返回
+  let x0 = null, y0 = 0, ind = null;
+  addEventListener('touchstart', e => { const t = e.touches[0]; if (t.clientX > 22 || !canGoBack()) return; x0 = t.clientX; y0 = t.clientY;
+    ind = document.createElement('div'); ind.id = 'swipeback'; ind.innerHTML = ic('left', 22); document.body.appendChild(ind); }, {passive:true});
+  addEventListener('touchmove', e => { if (x0 === null) return; const t = e.touches[0], dx = Math.max(0, t.clientX - x0);
+    ind.style.transform = `translate(${Math.min(dx, 90) - 44}px, ${t.clientY - 22}px) scale(${Math.min(1, .5 + dx / 160)})`; ind.style.opacity = Math.min(1, dx / 70); }, {passive:true});
+  addEventListener('touchend', e => { if (x0 === null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = Math.abs(t.clientY - y0);
+    x0 = null; ind && ind.remove(); ind = null; if (dx > 70 && dy < 80) goBack(); });
+  addEventListener('touchcancel', () => { x0 = null; ind && ind.remove(); ind = null; });
+})();
+
+/* 離開 App 再回來：回到首頁＋今天（停靠點）。正在記帳且已輸入內容時保留，避免資料遺失 */
+let awayAt = 0, BUSY_UNTIL = 0;
+const LAUNCH_CARRIER = location.hash === '#carrier';
+function hasDraft(){ return LAYERS.some(l => l.key === 'add') && F && (F.amtExpr || F.note.trim()); }
+function backToDock(){
+  if (!S.ready || Date.now() < BUSY_UNTIL) return;
+  const keepAdd = hasDraft();
+  for (const L of [...LAYERS]) if (!(keepAdd && L.key === 'add')) closeLayer(L.key, true);
+  const n = new Date();
+  S.ui.sel = today(); S.ui.sorting = false; S.ui.rp = {...S.ui.rp, per:'month', y:n.getFullYear(), m:n.getMonth()};
+  S.ui.tab = LAUNCH_CARRIER ? 'carrier' : 'home';
+  history.replaceState(null, '', location.pathname + location.search + (LAUNCH_CARRIER ? '#carrier' : ''));
+  render(); scrollTo(0, 0);
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { awayAt = Date.now(); return; }
+  if (awayAt && Date.now() - awayAt >= (+P.dockAfter || 0) * 1000) backToDock();
+});
+/* 隱藏主機商自動插入的浮動標籤（例如 Powered by Netlify），避免擋住下方按鈕 */
+(function(){
+  const OWN = new Set(['app', 'nav', 'layers', 'toast', 'lock', 'swipeback']);
+  const hide = () => {
+    for (const el of [...document.body.children, ...[...document.documentElement.children].filter(e => e !== document.head && e !== document.body)]) {
+      if (/^(SCRIPT|STYLE|LINK|TEMPLATE|META)$/.test(el.tagName) || OWN.has(el.id) || el.dataset.own || el.classList.contains('sortable-fallback')) continue;
+      el.style.setProperty('display', 'none', 'important'); el.style.setProperty('visibility', 'hidden', 'important'); el.style.setProperty('pointer-events', 'none', 'important');
+    }
+  };
+  new MutationObserver(hide).observe(document.body, {childList:true});
+  new MutationObserver(hide).observe(document.documentElement, {childList:true});
+  hide(); setTimeout(hide, 1500); setTimeout(hide, 5000);
+})();
+boot();
+</script>
+</body>
+</html>
