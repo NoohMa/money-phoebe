@@ -256,6 +256,8 @@ a[href*="netlify.com"],[id*="netlify" i],[class*="netlify" i]{display:none!impor
      }
    }
    ========================================================= */
+// 功能開關：可在 config.js 用 window.MONEY_OPTIONS = {carrier:false} 關閉載具
+const FEAT = {carrier:true, ...(window.MONEY_OPTIONS || {})};
 // 雲端設定放在同資料夾的 config.js（換人使用時只要改那個檔）
 const FIREBASE_CONFIG = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey) ? window.FIREBASE_CONFIG : null;
 /* 範例：
@@ -268,7 +270,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.9';
+const VERSION = 'v2.11';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -415,28 +417,31 @@ try { RATES = JSON.parse(localStorage.getItem(RATE_KEY)) || RATES; } catch(e){}
 const rate = cur => cur === 'TWD' ? 1 : (+(S.settings.rateOverride || {})[cur] || RATES.r[cur] || FALLBACK_RATE[cur] || 1);
 
 let db = null, auth = null, ledgerRef = null, unsubs = [];
-let VER = 0; const bump = () => { VER++; };
+let VER = 0; const bump = () => { VER++; snapSave(); };
 
 /* ---------- store ---------- */
 function readLocal(){ try { return JSON.parse(localStorage.getItem(LOCAL_KEY)); } catch(e){ return null; } }
 function saveLocal(){ if (S.mode !== 'local') return; try { localStorage.setItem(LOCAL_KEY, JSON.stringify({data:S.data, settings:S.settings})); } catch(e){ toast('儲存空間不足'); } }
+/* 雲端還在連線時先記下來，連上後自動補送 */
+const PENDING = [];
+function cloudWrite(fn){ if (ledgerRef) fn(ledgerRef); else PENDING.push(fn); }
 function put(col, obj, silent){
   obj.updatedAt = Date.now();
   S.data[col][obj.id] = obj; bump();
-  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection(col).doc(obj.id).set(obj).catch(e => toast('同步失敗：' + e.code));
+  if (S.mode === 'cloud') cloudWrite(L => L.collection(col).doc(obj.id).set(obj).catch(e => toast('同步失敗：' + e.code)));
   else saveLocal();
   if (!silent) render();
 }
 function del(col, id){
   delete S.data[col][id]; bump();
-  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection(col).doc(id).set({id, deleted:true, updatedAt:Date.now()}).catch(e => toast('同步失敗：' + e.code));
+  if (S.mode === 'cloud') { const t = Date.now(); cloudWrite(L => L.collection(col).doc(id).set({id, deleted:true, updatedAt:t}).catch(e => toast('同步失敗：' + e.code))); }
   else saveLocal();
   render();
 }
 function putSettings(patch){
   S.settings = {...S.settings, ...patch};
   if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
-  if (S.mode === 'cloud' && ledgerRef) ledgerRef.collection('meta').doc('settings').set(S.settings, {merge:true});
+  if (S.mode === 'cloud') { const st = S.settings; cloudWrite(L => L.collection('meta').doc('settings').set(st, {merge:true})); bump(); }
   else saveLocal();
   applyTheme(); render();
 }
@@ -608,7 +613,7 @@ const sheet = (key, title, body) => `<div class="bd" onclick="closeLayer('${key}
 
 /* ---------- render ---------- */
 function render(){
-  if (S.mode === 'cloud' && !S.user) { $('#nav').innerHTML = ''; return renderLogin(); }
+  if (S.mode === 'cloud' && !S.user) { $('#nav').innerHTML = ''; if (!AUTH_KNOWN) { $('#app').innerHTML = '<div class="empty" style="padding-top:40vh">載入中…</div>'; return; } return renderLogin(); }
   if (!S.ready) { $('#app').innerHTML = '<div class="empty" style="padding-top:40vh">載入中…</div>'; return; }
   const v = {home:viewHome, accounts:viewAccounts, acct:viewAcct, carrier:viewCarrier, settings:viewSettings, reports:viewReports}[S.ui.tab] || viewHome;
   $('#app').innerHTML = v();
@@ -626,7 +631,7 @@ function renderNav(){
     <button class="${on('accounts')}" onclick="go('accounts')">${ic('wallet',24)}帳戶</button>
     <button class="${on('settings')}" onclick="go('settings')">${ic('gear',24)}設定</button></div>`;
 }
-function go(tab){ if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
+function go(tab){ if (tab === 'carrier' && !FEAT.carrier) tab = 'home'; if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
 
 /* ---------- home ---------- */
 function catOf(id){ return S.data.categories[id]; }
@@ -691,7 +696,7 @@ function viewHome(){
   const perCell = (label, s, fn) => `<div class="tap" onclick="${fn}"><small>${label} ›</small><p><span class="exp">${twd(-s.exp)}</span><br><span class="inc">${twd(s.inc, true)}</span></p></div>`;
   return `<div class="top"><div><div class="brand">MONEY</div><h1>${y} 年 ${m+1} 月</h1></div>
     <div style="display:flex;gap:4px">${sel !== td ? `<button class="ib" onclick="selDay('${td}')" style="font-size:13px;width:auto;padding:0 10px;color:var(--acc)">今天</button>` : ''}
-    <button class="ib" onclick="openSearch()">${ic('search',22)}</button><button class="ib" onclick="go('carrier')">${ic('barcode',22)}</button><button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
+    <button class="ib" onclick="openSearch()">${ic('search',22)}</button>${FEAT.carrier ? `<button class="ib" onclick="go('carrier')">${ic('barcode',22)}</button>` : ''}<button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
     ${alerts()}
     <div class="week" id="week"><button class="arr" onclick="selDay('${addD(sel,-7)}')">${ic('left',20)}</button><div class="days">${days}</div><button class="arr" onclick="selDay('${addD(sel,7)}')">${ic('right',20)}</button></div>
     <div class="card"><div class="sum3">
@@ -1350,8 +1355,9 @@ async function bulkPut(col, arr){
   const now = Date.now();
   for (const o of arr) { o.updatedAt = now; S.data[col][o.id] = o; }
   bump();
-  if (S.mode === 'cloud' && ledgerRef) {
-    for (let i = 0; i < arr.length; i += 400) { const b = db.batch(); arr.slice(i, i + 400).forEach(o => b.set(ledgerRef.collection(col).doc(o.id), o)); await b.commit(); }
+  if (S.mode === 'cloud') {
+    const run = async L => { for (let i = 0; i < arr.length; i += 400) { const b = db.batch(); arr.slice(i, i + 400).forEach(o => b.set(L.collection(col).doc(o.id), o)); await b.commit(); } };
+    if (ledgerRef) await run(ledgerRef); else PENDING.push(L => run(L).catch(e => toast('同步失敗：' + (e.code || e.message))));
   } else saveLocal();
 }
 
@@ -1844,7 +1850,7 @@ function viewSettings(){
       <button class="row" onclick="openTplMgr()"><span class="mid"><b>常用範本</b><small>${tplList().length} 個</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openCatMgr()"><span class="mid"><b>分類管理</b><small>新增、改名、刪除</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openProjMgr()"><span class="mid"><b>專案管理</b><small>${Object.values(S.data.projects).filter(p => !p.hidden).length} 個專案</small></span>${ic('right',18)}</button>
-      <button class="row" onclick="editCarrier()"><span class="mid"><b>手機條碼載具</b><small>${esc(S.settings.carrier || P.carrier || '未設定')}</small></span>${ic('right',18)}</button>
+      ${FEAT.carrier ? `<button class="row" onclick="editCarrier()"><span class="mid"><b>手機條碼載具</b><small>${esc(S.settings.carrier || P.carrier || '未設定')}</small></span>${ic('right',18)}</button>` : ''}
       <button class="row" onclick="openExport()"><span class="mid"><b>匯出 CSV／完整備份</b><small>CSV 可用 Excel 開；備份檔可匯回</small></span>${ic('right',18)}</button>
       <button class="row" onclick="pickImport()"><span class="mid"><b>匯入</b><small>CMoney CSV、Money CSV、備份檔；同一筆不會重複</small></span>${ic('right',18)}</button></div>
     <div class="grp"><span>匯率（1 外幣 = ? 台幣）</span><button style="color:var(--acc);display:flex;gap:4px;align-items:center" onclick="refreshRates(true)">${ic('refresh',16)}更新</button></div>
@@ -1982,11 +1988,26 @@ async function batchWrite(lref, data){
     const b = db.batch(); ops.slice(i, i + 400).forEach(([col, o]) => b.set(lref.collection(col).doc(o.id), o)); await b.commit();
   }
 }
-async function attachLedger(u){
-  S.ready = false; render();
+/* ---------- 秒開：把上次的資料存在手機裡，開 App 先顯示，再背景同步 ---------- */
+let AUTH_KNOWN = false, READY_ONCE = false;
+const SNAP_DB = 'money_snap' + STORE_NS;
+function idb(){ return new Promise((res, rej) => { const r = indexedDB.open(SNAP_DB, 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function snapGet(){ try { const d = await idb(); return await new Promise(res => { const q = d.transaction('kv').objectStore('kv').get('snap'); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); } catch(e) { return null; } }
+let snapT;
+function snapSave(){
+  if (S.mode !== 'cloud' || !S.user || !S.ready || !S.ledgerId) return;
+  clearTimeout(snapT);
+  snapT = setTimeout(async () => { try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').put({uid:S.user.uid, lid:S.ledgerId, data:S.data, settings:S.settings, at:Date.now()}, 'snap'); } catch(e) {} }, 1500);
+}
+async function snapClear(){ try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').delete('snap'); } catch(e) {} }
+function readyOnce(){ if (READY_ONCE) return; READY_ONCE = true; afterReady(); }
+const emptyData = () => ({accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}});
+
+async function attachLedger(u, keep){
+  if (!keep) { S.ready = false; render(); }
   const uref = db.collection('users').doc(u.uid);
-  const snap = await uref.get();
-  let lid = snap.exists ? snap.data().ledgerId : null;
+  let lid = keep ? S.ledgerId : null;
+  if (!lid) { const snap = await uref.get(); lid = snap.exists ? snap.data().ledgerId : null; }
   if (!lid) {
     lid = 'l_' + uid();
     const lref = db.collection('ledgers').doc(lid);
@@ -1999,13 +2020,15 @@ async function attachLedger(u){
     await uref.set({ledgerId:lid});
   }
   S.ledgerId = lid; ledgerRef = db.collection('ledgers').doc(lid);
-  let pending = COLS.length + 1; const done = () => { if (--pending === 0) { S.ready = true; render(); afterReady(); } };
+  while (PENDING.length) PENDING.shift()(ledgerRef);
+  let pending = COLS.length + 1; const done = () => { if (--pending === 0) { S.ready = true; bump(); render(); readyOnce(); } };
   let rt; const sched = () => { clearTimeout(rt); rt = setTimeout(() => { bump(); if (S.ready) render(); }, 60); };
   // 先讀手機裡的快取（不計費），再只向雲端要「有變動」的資料，省讀取額度
-  for (const col of COLS) {
-    const cached = {}; let maxU = 0;
-    try { const qs = await ledgerRef.collection(col).get({source:'cache'}); qs.forEach(d => { const o = d.data(); maxU = Math.max(maxU, +o.updatedAt || 0); if (!o.deleted) cached[d.id] = o; }); } catch(e) {}
-    S.data[col] = cached;
+  const cachedAll = keep ? null : await Promise.all(COLS.map(col => ledgerRef.collection(col).get({source:'cache'}).catch(() => null)));
+  for (const [ci, col] of COLS.entries()) {
+    let maxU = 0;
+    if (keep) { S.data[col] = S.data[col] || {}; for (const o of Object.values(S.data[col])) maxU = Math.max(maxU, +o.updatedAt || 0); }
+    else { const cached = {}; cachedAll[ci]?.forEach(d => { const o = d.data(); maxU = Math.max(maxU, +o.updatedAt || 0); if (!o.deleted) cached[d.id] = o; }); S.data[col] = cached; }
     const q = maxU ? ledgerRef.collection(col).where('updatedAt', '>', maxU - 600000) : ledgerRef.collection(col);
     let first = true;
     unsubs.push(q.onSnapshot(qs => {
@@ -2024,7 +2047,7 @@ function afterReady(){
 }
 function openTplMgr(){ F = blankF(); openTpl(); }
 function boot(){
-  if (location.hash === '#carrier') S.ui.tab = 'carrier';
+  if (location.hash === '#carrier' && FEAT.carrier) S.ui.tab = 'carrier';
   if (P.pin) lockNow();
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (FIREBASE_CONFIG && typeof firebase === 'undefined') {
@@ -2037,10 +2060,26 @@ function boot(){
     db.enablePersistence({synchronizeTabs:true}).catch(() => {});
     auth = firebase.auth();
     applyTheme(); render();
-    auth.onAuthStateChanged(u => {
-      S.user = u;
-      if (!u) { S.ready = false; ledgerRef = null; S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}}; render(); return; }
-      attachLedger(u).catch(e => { toast('連線失敗：' + (e.code || e.message)); });
+    const snapP = P.lastUid ? snapGet() : Promise.resolve(null);
+    snapP.then(sn => {
+      if (sn && sn.uid === P.lastUid && !S.user) {
+        S.data = {...emptyData(), ...sn.data}; S.settings = {...S.settings, ...(sn.settings || {})};
+        S.user = {uid:sn.uid, email:P.lastEmail || '', fromSnap:true}; S.ledgerId = sn.lid; S.ready = true;
+        bump(); applyTheme(); render(); readyOnce();
+      }
+    }).finally(() => {
+      auth.onAuthStateChanged(u => {
+        AUTH_KNOWN = true;
+        if (!u) {
+          unsubs.forEach(f => f()); unsubs = []; ledgerRef = null; S.user = null; S.ledgerId = null; S.ready = false; READY_ONCE = false;
+          S.data = emptyData(); snapClear(); P.lastUid = null; savePrefs(); render(); return;
+        }
+        const keep = !!(S.user && S.user.uid === u.uid && S.ready && S.ledgerId);
+        if (!keep) { S.data = emptyData(); S.ledgerId = null; }
+        S.user = u; P.lastUid = u.uid; P.lastEmail = u.email; savePrefs();
+        if (keep) render();
+        attachLedger(u, keep).catch(e => { toast('連線失敗：' + (e.code || e.message)); });
+      });
     });
   } else {
     S.mode = 'local';
@@ -2086,7 +2125,7 @@ addEventListener('popstate', () => {
 
 /* 離開 App 再回來：回到首頁＋今天（停靠點）。正在記帳且已輸入內容時保留，避免資料遺失 */
 let awayAt = 0, BUSY_UNTIL = 0;
-const LAUNCH_CARRIER = location.hash === '#carrier';
+const LAUNCH_CARRIER = location.hash === '#carrier' && FEAT.carrier;
 function hasDraft(){ return LAYERS.some(l => l.key === 'add') && F && (F.amtExpr || F.note.trim()); }
 function backToDock(){
   if (!S.ready || Date.now() < BUSY_UNTIL) return;
