@@ -283,7 +283,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.28';
+const VERSION = 'v2.29';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -1469,7 +1469,7 @@ function renderAdd(){
       <textarea class="note" rows="2" placeholder="備註" oninput="F.note=this.value" onfocus="typingOn(this)" onblur="typingOff(this)">${esc(F.note)}</textarea>
       ${notes.length ? `<div class="chips">${notes.map(n => `<button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();this.closest('.layer').classList.remove('typing');F.note=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}
     </div>
-    <div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','%','0','.','+'].map(k => `<button class="${OPS.test(k) || k === '%' ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div>
+    <div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','00','0','.','+'].map(k => `<button class="${OPS.test(k) || k === '%' ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div>
     <div class="kbok"><button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();saveTxn()">OK 存檔</button></div></div>`;
 }
 /* v2.21：電腦（滑鼠＋實體鍵盤）打字時不藏計算機；手機打字時藏計算機，鍵盤上方留「OK 存檔」條 */
