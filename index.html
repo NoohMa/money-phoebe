@@ -283,7 +283,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.22';
+const VERSION = 'v2.24';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -427,7 +427,7 @@ try { Object.assign(P, JSON.parse(localStorage.getItem(PREF_KEY) || '{}')); } ca
 const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(P)); } catch(e){} };
 let RATES = {at:0, r:{}};
 try { RATES = JSON.parse(localStorage.getItem(RATE_KEY)) || RATES; } catch(e){}
-const rate = cur => cur === 'TWD' ? 1 : (+(S.settings.rateOverride || {})[cur] || RATES.r[cur] || FALLBACK_RATE[cur] || 1);
+const rate = cur => cur === 'TWD' ? 1 : (RATES.r[cur] || FALLBACK_RATE[cur] || 1);   // v2.24：不再用自訂匯率
 
 let db = null, auth = null, ledgerRef = null, unsubs = [];
 let VER = 0; const bump = () => { VER++; snapSave(); };
@@ -457,6 +457,7 @@ let colorT = null;
 function colorPrev(k, v){ S.settings = {...S.settings, theme:'custom', custom:{...(S.settings.custom || {}), [k]:v}}; applyTheme(); }
 function colorSave(k, v){ colorPrev(k, v); clearTimeout(colorT); colorT = setTimeout(() => { const st = S.settings; if (S.mode === 'cloud') { cloudWrite(L => L.collection('meta').doc('settings').set(clean(st))); bump(); } else saveLocal(); }, 400); }
 function colorDone(){ setTimeout(() => { if (!document.activeElement || document.activeElement.type !== 'color') render(); }, 500); }
+function setNickname(){ const v = prompt('顯示名稱', S.settings.nickname || ''); if (v === null) return; putSettings({nickname:v.trim().slice(0, 20)}); }
 function putSettings(patch){
   S.settings = {...S.settings, ...patch};
   if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
@@ -714,11 +715,12 @@ function applyTheme(){
 }
 let iconFor = '';
 function makeIcon(color){
+  color = '#2BB3A3';   // v2.23：主畫面圖示固定湖水綠，不跟主題變
   if (iconFor === color) return; iconFor = color;
   const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
   x.fillStyle = color; x.fillRect(0, 0, 180, 180);
   x.fillStyle = '#fff'; x.font = 'bold 104px -apple-system,Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', 90, 96);
-  const u = c.toDataURL('image/png'); $('#touchIcon').href = u; $('#favIcon').href = u;
+  const u = c.toDataURL('image/png'); $('#touchIcon').href = 'icon-192.png'; $('#favIcon').href = u;
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { applyTheme(); });
 
@@ -2631,7 +2633,7 @@ function viewSettings(){
   return `<div class="top"><h1>設定</h1></div>
     <div class="grp"><span>同步</span></div>
     <div class="list set">${S.mode === 'cloud'
-      ? `<div class="row"><span class="mid"><b>${esc(S.user?.email || '')}</b><small>雲端同步中 · 換手機登入即可取回資料</small></span><button style="color:var(--exp)" onclick="logout()">登出</button></div>`
+      ? `<div class="row"><button class="mid" style="text-align:left" onclick="setNickname()"><b>${esc(S.settings.nickname || '我的帳本')} <span class="tx2" style="font-weight:400">${ic('edit',14)}</span></b><small>雲端同步中 · 換手機登入即可取回資料</small></button><button style="color:var(--exp)" onclick="logout()">登出</button></div>`
       : `<div class="row"><span class="mid"><b>本機模式</b><small>資料只存在這支手機的瀏覽器，設定 Firebase 後可跨裝置同步</small></span></div>`}</div>
     <div class="grp"><span>外觀</span></div>
     <div class="card mt0" style="margin-top:0"><div class="thm">${Object.entries(THEMES).map(([k, v]) => `<button class="${th === k ? 'on' : ''}" onclick="putSettings({theme:'${k}'})"><div class="dots"><i style="background:${v.pri}"></i><i style="background:${v.acc}"></i></div>${v.name}</button>`).join('')}
@@ -2660,9 +2662,6 @@ function viewSettings(){
       ${FEAT.carrier ? `<button class="row" onclick="editCarrier()"><span class="mid"><b>手機條碼載具</b><small>${esc(S.settings.carrier || P.carrier || '未設定')}</small></span>${ic('right',18)}</button>` : ''}
       <button class="row" onclick="openExport()"><span class="mid"><b>匯出 CSV／完整備份</b><small>CSV 可用 Excel 開；備份檔可匯回</small></span>${ic('right',18)}</button>
       <button class="row" onclick="pickImport()"><span class="mid"><b>匯入</b><small>CMoney CSV、Money CSV、備份檔；同一筆不會重複</small></span>${ic('right',18)}</button></div>
-    <div class="grp"><span>匯率（1 外幣 = ? 台幣）</span><button style="color:var(--acc);display:flex;gap:4px;align-items:center" onclick="refreshRates(true)">${ic('refresh',16)}更新</button></div>
-    <div class="list set">${rateRows}</div>
-    <div class="hint">${RATES.at ? '即時匯率更新於 ' + new Date(RATES.at).toLocaleString('zh-TW') : '尚未取得即時匯率，使用預設值'}。帳戶資產用即時匯率；收支報表用你換匯時的實際匯率。</div>
     <div class="hint" style="text-align:center;margin-top:20px">Money ${VERSION}</div>`;
 }
 function setOverride(c, v){ const o = {...(S.settings.rateOverride || {})}; if (parseFloat(v) > 0) o[c] = parseFloat(v); else delete o[c]; bump(); putSettings({rateOverride:o}); }
@@ -2807,7 +2806,7 @@ function snapSave(){
   snapT = setTimeout(async () => { try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').put({uid:S.user.uid, lid:S.ledgerId, data:S.data, settings:S.settings, at:Date.now()}, 'snap'); } catch(e) {} }, 1500);
 }
 async function snapClear(){ try { const d = await idb(); d.transaction('kv', 'readwrite').objectStore('kv').delete('snap'); } catch(e) {} }
-function readyOnce(){ if (READY_ONCE) return; READY_ONCE = true; afterReady(); }
+function readyOnce(){ setTimeout(() => { if (Object.keys(S.settings.rateOverride || {}).length) putSettings({rateOverride:{}}); }, 3000); if (READY_ONCE) return; READY_ONCE = true; afterReady(); }
 const emptyData = () => ({accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}});
 
 async function attachLedger(u, keep){
