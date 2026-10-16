@@ -283,7 +283,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.24';
+const VERSION = 'v2.25';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -871,7 +871,7 @@ function viewHome(){
   const perCell = (label, s, fn, cmp) => `<div class="tap" onclick="${fn}"><small>${label} ›</small><p><span class="exp">${twd(-s.exp)}</span><br><span class="inc">${twd(s.inc, true)}</span>${cmp || ''}</p></div>`;
   const wcut = sel < addD(ws, 6) ? sel : addD(ws, 6), wDays = diffDays(ws, wcut), pws = addD(ws, -7), wPrev = summary(pws, addD(pws, wDays)), wNow = summary(ws, wcut);
   const [pmY, pmM] = prevYM(y, m), mPrev = summary(ds(new Date(pmY, pmM, 1)), sameDayCut(pmY, pmM, sel)), mNow = summary(mFrom, sel);
-  return `<div class="top"><div><div class="brand">MONEY</div><h1 style="cursor:pointer" onclick="openYM('home')">${y} 年 ${m+1} 月 <span style="font-size:14px;color:var(--tx2)">▾</span></h1></div>
+  return `<div class="top"><div><div class="brand">${esc(S.settings.nickname || 'MONEY')}</div><h1 style="cursor:pointer" onclick="openYM('home')">${y} 年 ${m+1} 月 <span style="font-size:14px;color:var(--tx2)">▾</span></h1></div>
     <div style="display:flex;gap:4px">${sel !== td ? `<button class="ib" onclick="selDay('${td}')" style="font-size:13px;width:auto;padding:0 10px;color:var(--acc)">今天</button>` : ''}
     <button class="ib" onclick="openSearch()">${ic('search',22)}</button>${FEAT.carrier ? `<button class="ib" onclick="go('carrier')">${ic('barcode',22)}</button>` : ''}<button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
     ${alerts()}${monthReportCard()}
@@ -1867,9 +1867,10 @@ function pressureData(aid){
   return {ms, sum};
 }
 function pressureCard(fixedAid){
-  const cards = Object.values(S.data.accounts).filter(a => a.type === 'credit' && cardPieces(a).length), aid = fixedAid || (cards.find(a => a.id === UX.pcard) ? UX.pcard : '');
+  const cards = Object.values(S.data.accounts).filter(a => a.type === 'credit' && !a.archived && a.inNW !== false).sort(byOrder), aid = fixedAid || (cards.find(a => a.id === UX.pcard) ? UX.pcard : '');
   const {ms, sum} = pressureData(aid);
-  if (!sum.some(v => v > 0)) return fixedAid ? '' : `<div class="card"><div class="sec" style="margin:0;padding:0"><h3>分期壓力</h3></div><div class="sm tx2" style="margin-top:6px">目前沒有分期 👍</div></div>`;
+  const chips0 = !fixedAid && cards.length > 1 ? `<div class="fxc" style="margin:6px 0 0"><button class="${!aid ? 'on' : ''}" onclick="UX.pcard='';render()">全部</button>${cards.map(a => `<button class="${aid === a.id ? 'on' : ''}" onclick="UX.pcard='${a.id}';render()">${esc(a.name)}</button>`).join('')}</div>` : '';
+  if (!sum.some(v => v > 0)) return fixedAid ? '' : `<div class="card"><div class="sec" style="margin:0;padding:0"><h3>分期壓力（每月要還）</h3></div>${chips0}<div class="sm tx2" style="margin-top:8px">${aid ? '這張卡目前沒有分期' : '目前沒有分期'} 👍</div></div>`;
   let drop = null; for (let i = 1; i < 12; i++) { const d = sum[i - 1] - sum[i]; if (d >= 300 && (!drop || d > drop.v)) drop = {i, v:d}; }
   const lastI = sum.reduce((l, v, i) => v > 0 ? i : l, -1);
   const chips = !fixedAid && cards.length > 1 ? `<div class="fxc" style="margin:0 0 6px"><button class="${!aid ? 'on' : ''}" onclick="UX.pcard='';render()">全部</button>${cards.map(a => `<button class="${aid === a.id ? 'on' : ''}" onclick="UX.pcard='${a.id}';render()">${esc(a.name)}</button>`).join('')}</div>` : '';
