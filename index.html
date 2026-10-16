@@ -283,7 +283,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.27';
+const VERSION = 'v2.28';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -1207,8 +1207,8 @@ function setStmt(aid){
 let PF = null;
 function openPlan(id, aid){
   const pl = id ? S.data.plans[id] : null, n = new Date(), nx = ds(new Date(n.getFullYear(), n.getMonth() + 1, 1)).slice(0, 7);
-  PF = pl ? {...pl, principal:String(pl.principal ?? ''), fee:pl.feeAuto ? '' : String(pl.fee || ''), n:String(pl.n), per:pl.kind === 'legacy' ? String(Math.round(pl.principal / pl.n)) : String(pl.per || ''), first:pl.kind === 'legacy' ? '' : String(pl.first || '')}
-          : {id:null, accountId:aid, kind:'bill', name:'', principal:'', n:'', fee:'', per:'', first:'', firstMonth:nx};
+  PF = pl ? {...pl, principal:String(pl.principal ?? ''), fee:pl.feeAuto ? '' : String(pl.fee || ''), n:String(pl.n), apr:String(pl.apr || ''), per:pl.kind === 'legacy' ? String(Math.round(pl.principal / pl.n)) : String(pl.per || ''), first:pl.kind === 'legacy' ? '' : String(pl.first || '')}
+          : {id:null, accountId:aid, kind:'bill', name:'', principal:'', n:'', fee:'', per:'', first:'', apr:'', firstMonth:nx};
   openLayer('plan', renderPlan, 'btm');
 }
 function renderPlan(){
@@ -1219,6 +1219,7 @@ function renderPlan(){
     <div class="fld"><label>名稱</label><input value="${esc(f.name)}" placeholder="${legacy ? '例：iPhone 分期' : '例：9 月帳單分期'}" oninput="PF.name=this.value"></div>
     ${legacy ? `<div class="two"><div class="fld"><label>剩餘期數</label>${inp('n', '例：4', 'numeric')}</div><div class="fld"><label>每期金額（${cur}，含手續費）</label>${inp('per', '例：2835')}</div></div>`
       : `<div class="two"><div class="fld"><label>分期總額（${cur}）</label>${inp('principal', '例：50000')}</div><div class="fld"><label>期數</label>${inp('n', '例：3', 'numeric')}</div></div>
+         <div class="fld"><label>年利率 %（知道年息才填；每期金額留空會自動算）</label>${inp('apr', '例：6')}</div>
          <div class="two"><div class="fld"><label>每期金額（照銀行）</label>${inp('per', '沒填就平均拆')}</div><div class="fld"><label>首期金額（可空白）</label>${inp('first', '跟每期不同才填')}</div></div>
          <div class="fld"><label>手續費／利息總額（沒有就留空）</label>${inp('fee', '例：600')}</div>
          <div class="hint" style="margin:-4px 0 12px">有填每期金額：手續費可留空，自動算＝各期合計－分期總額（算進「金融 > 手續費」）。</div>`}
@@ -1234,9 +1235,9 @@ function savePlan(){
   let principal, fee = 0, per = null, first = null, feeAuto = null;
   if (f.kind === 'legacy') { const pv = parseFloat(f.per); if (!(pv > 0)) return toast('請輸入每期金額'); principal = Math.round(pv * n * 100) / 100; }
   else { principal = parseFloat(f.principal); fee = parseFloat(f.fee) || 0; if (!(principal > 0)) return toast('請輸入分期總額');
-    const pv = parseFloat(f.per) || 0, fv = parseFloat(f.first) || 0;
+    const ap = parseFloat(f.apr) || 0, pv = parseFloat(f.per) || aprPer(principal, n, ap), fv = parseFloat(f.first) || 0;
     if (pv > 0 && n >= 2) { const r = instCalc(principal, n, pv, fv, fee); if (r.err) return toast(r.err); per = pv; first = fv > 0 ? fv : null; fee = r.fee; feeAuto = r.auto || null; } }
-  put('plans', {...(f.id ? S.data.plans[f.id] || {} : {}), id:f.id || 'pl_' + uid(), accountId:f.accountId, kind:f.kind, name:f.name.trim(), principal, n, fee, per, first, feeAuto, firstMonth:f.firstMonth, createdAt:f.createdAt || Date.now()}, true);
+  put('plans', {...(f.id ? S.data.plans[f.id] || {} : {}), id:f.id || 'pl_' + uid(), accountId:f.accountId, kind:f.kind, name:f.name.trim(), principal, n, fee, per, first, feeAuto, apr:(f.kind !== 'legacy' && parseFloat(f.apr) > 0) ? parseFloat(f.apr) : null, firstMonth:f.firstMonth, createdAt:f.createdAt || Date.now()}, true);
   closeLayer('plan'); render(); toast(feeAuto && fee ? `已儲存，利息 ${nf(fee, 2)} 算進手續費` : '已儲存');
 }
 function delPlan(){ if (!confirm('刪除這個分期？')) return; const id = PF.id; closeLayer('plan'); del('plans', id); }
@@ -1298,6 +1299,7 @@ let F = null;
 const OPS = /[+\-×÷]/;
 function evalExpr(s){
   if (!s) return 0;
+  s = s.replace(/(\d+\.?\d*|\.\d+)%/g, (m0, n0) => String(parseFloat(n0) / 100));   // v2.28：1.5% → 0.015
   s = s.replace(/[+\-×÷.]+$/, '');
   const tk = s.match(/\d+\.?\d*|\.\d+|[+\-×÷]/g); if (!tk) return 0;
   const nums = [], ops = [];
@@ -1312,8 +1314,8 @@ function evalExpr(s){
   let v = n2[0]; o2.forEach((o, i) => { v = o === '+' ? v + n2[i+1] : v - n2[i+1]; });
   return Math.round(v * 100) / 100;
 }
-function rawFmt(s){ if (!s) return '0'; if (OPS.test(s)) return nf(evalExpr(s), 2); const [i, d] = s.split('.'); return Number(i || 0).toLocaleString('en-US') + (d !== undefined ? '.' + d : ''); }
-const exLine = s => s && OPS.test(s) ? `<div class="ex">${esc(s)}</div>` : '';
+function rawFmt(s){ if (!s) return '0'; if (OPS.test(s) || s.includes('%')) return nf(evalExpr(s), 2); const [i, d] = s.split('.'); return Number(i || 0).toLocaleString('en-US') + (d !== undefined ? '.' + d : ''); }
+const exLine = s => s && (OPS.test(s) || s.includes('%')) ? `<div class="ex">${esc(s)}</div>` : '';
 const exprOf = n => n ? String(n) : '';
 function defaultCat(type){
   const last = P.lastCat[type]; if (last && S.data.categories[last] && !S.data.categories[last].hidden) return last;
@@ -1363,11 +1365,11 @@ function storeSuggest(catId){
 function defaultAcc(){ const l = P.lastAcc; if (l && S.data.accounts[l] && !S.data.accounts[l].archived) return l; return accList()[0]?.id || null; }
 function blankF(){
   const accs = accList(), from = defaultAcc();
-  return {id:null, mode:'txn', type:'expense', catId:suggestCat() || defaultCat('expense'), amtExpr:'', toExpr:'', feeExpr:'', instN:0, instFeeExpr:'', instPerExpr:'', instFirstExpr:'', fxExpr:'', nextBill:false, repeat:'', until:'', active:'amt',
+  return {id:null, mode:'txn', type:'expense', catId:suggestCat() || defaultCat('expense'), amtExpr:'', toExpr:'', feeExpr:'', instN:0, instFeeExpr:'', instPerExpr:'', instFirstExpr:'', instAprExpr:'', perAuto:false, fxExpr:'', nextBill:false, repeat:'', until:'', active:'amt',
     date:S.ui.tab === 'home' ? S.ui.sel : today(), accountId:from, toAccountId:(accs.find(a => a.id !== from) || accs[0]).id, projectId:'', note:'', store:''};
 }
 function fFromObj(o){
-  return {type:o.type, catId:o.catId, amtExpr:exprOf(o.amount), toExpr:exprOf(o.toAmount), feeExpr:exprOf(o.fee), instN:o.inst?.n || 0, instFeeExpr:o.inst?.feeAuto ? '' : exprOf(o.inst?.fee), instPerExpr:exprOf(o.inst?.per), instFirstExpr:exprOf(o.inst?.first), fxExpr:exprOf(o.fxFee), nextBill:!!o.nextBill,
+  return {type:o.type, catId:o.catId, amtExpr:exprOf(o.amount), toExpr:exprOf(o.toAmount), feeExpr:exprOf(o.fee), instN:o.inst?.n || 0, instFeeExpr:o.inst?.feeAuto ? '' : exprOf(o.inst?.fee), instPerExpr:exprOf(o.inst?.per), instFirstExpr:exprOf(o.inst?.first), instAprExpr:exprOf(o.inst?.apr), perAuto:false, fxExpr:exprOf(o.fxFee), nextBill:!!o.nextBill,
     accountId:o.accountId, toAccountId:o.toAccountId || (accList().find(a => a.id !== o.accountId) || {}).id, projectId:o.projectId || '', note:o.note || '', store:o.store || ''};
 }
 function openAdd(id, preset){
@@ -1411,11 +1413,13 @@ function renderAdd(){
       <select class="ov" onchange="setF('accountId',this.value)">${accOpts(F.accountId)}</select></div>`;
     if (t === 'expense' && a && a.type === 'credit' && !rule) {
       const n = +F.instN || 0, opts = [...new Set([...INST_OPTS, ...(n > 1 ? [n] : [])])].sort((x, y) => x - y);
+      { const ap = evalExpr(F.instAprExpr), pa = aprPer(evalExpr(F.amtExpr), +F.instN || 0, ap); if (F.perAuto && pa) { F.instPerExpr = String(pa); F.instFirstExpr = ''; F.instFeeExpr = ''; } }
       const amt = evalExpr(F.amtExpr), fee = evalExpr(F.instFeeExpr), per = evalExpr(F.instPerExpr), first = evalExpr(F.instFirstExpr), sym = CUR[cur].sym;
       const auto = n > 1 && per > 0 && !fee && amt > 0 ? rd2((first > 0 ? first : per) + per * (n - 1) - amt) : null;
       fields += `<div class="frow"><span class="lb">分期</span><span class="vl"><b class="${n > 1 ? '' : 'tx2'}">${n > 1 ? n + ' 期' : '不分期'}</b>${n > 1 && amt ? `<span class="tx2 sm">${per > 0 ? '每期 ' + fmt(per, cur) : '每期約 ' + fmt((amt + fee) / n, cur)}</span>` : ''}</span>${ic('down',16)}
         <select class="ov" onchange="setInst(this.value)"><option value="0">不分期</option>${opts.map(o => `<option value="${o}" ${o === n ? 'selected' : ''}>${o} 期</option>`).join('')}<option value="custom">自訂期數…</option></select></div>
         ${n > 1 && amt > 0 ? instPreview(a, amt, fee, per, first, n) : ''}
+        ${n > 1 ? `<div class="frow ${F.active === 'iapr' ? 'on' : ''}" onclick="setAct('iapr')"><span class="lb" style="width:auto">年利率</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instAprExpr ? '' : 'tx2'}">${F.instAprExpr ? esc(F.instAprExpr) + ' %' : '知道年息才填，自動算每期'}</b>${F.instAprExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instAprExpr='';F.perAuto=false;F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>` : ''}
         ${n > 1 ? `<div class="frow ${F.active === 'iper' ? 'on' : ''}" onclick="setAct('iper')"><span class="lb" style="width:auto">每期金額（照銀行）</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instPerExpr ? '' : 'tx2'}">${F.instPerExpr ? sym + rawFmt(F.instPerExpr) : '沒填就平均拆'}</b>${F.instPerExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instPerExpr='';F.instFirstExpr='';F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>
         ${F.instPerExpr ? `<div class="frow ${F.active === 'ifirst' ? 'on' : ''}" onclick="setAct('ifirst')"><span class="lb" style="width:auto">首期金額</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instFirstExpr ? '' : 'tx2'}">${F.instFirstExpr ? sym + rawFmt(F.instFirstExpr) : '跟每期不同才填'}</b>${F.instFirstExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instFirstExpr='';F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>` : ''}
         <div class="frow ${F.active === 'ifee' ? 'on' : ''}" onclick="setAct('ifee')"><span class="lb" style="width:auto">手續費／利息</span><span class="vl" style="justify-content:flex-end"><b class="${F.instFeeExpr ? 'exp' : 'tx2'}">${F.instFeeExpr ? sym + rawFmt(F.instFeeExpr) : auto !== null ? (auto < 0 ? '每期合計比金額少' : `自動算 ${sym}${nf(auto, 2)}`) : '總額，點此輸入'}</b></span></div>` : ''}`;
@@ -1465,7 +1469,7 @@ function renderAdd(){
       <textarea class="note" rows="2" placeholder="備註" oninput="F.note=this.value" onfocus="typingOn(this)" onblur="typingOff(this)">${esc(F.note)}</textarea>
       ${notes.length ? `<div class="chips">${notes.map(n => `<button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();this.closest('.layer').classList.remove('typing');F.note=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}
     </div>
-    <div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','00','0','.','+'].map(k => `<button class="${OPS.test(k) ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div>
+    <div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','%','0','.','+'].map(k => `<button class="${OPS.test(k) || k === '%' ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div>
     <div class="kbok"><button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();saveTxn()">OK 存檔</button></div></div>`;
 }
 /* v2.21：電腦（滑鼠＋實體鍵盤）打字時不藏計算機；手機打字時藏計算機，鍵盤上方留「OK 存檔」條 */
@@ -1486,7 +1490,7 @@ document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
   const k = e.key, tg = e.target; if (tg && (/^(TEXTAREA|SELECT)$/.test(tg.tagName) || tg.isContentEditable || (tg.tagName === 'INPUT' && !tg.classList.contains('ov') && !/^(checkbox|radio|button)$/.test(tg.type)))) return;
   if (tg && tg.tagName === 'INPUT' && tg.classList.contains('ov') && k === 'Enter') return;   // 日期選擇器開著時 Enter 交給瀏覽器
-  const m = {'*':'×', 'x':'×', 'X':'×', '/':'÷', '+':'+', '-':'-', '.':'.', 'Backspace':'⌫'};
+  const m = {'*':'×', 'x':'×', 'X':'×', '/':'÷', '+':'+', '-':'-', '.':'.', '%':'%', 'Backspace':'⌫'};
   if (k === 'Enter') { e.preventDefault(); return saveTxn(); }
   if (k === 'Escape') { e.preventDefault(); return closeLayer('add'); }
   const v = /^[0-9]$/.test(k) ? k : m[k]; if (!v) return;
@@ -1503,7 +1507,7 @@ function instPreview(a, amt, fee, per, first, n){
 function setInst(v){
   if (v === 'custom') { const n = parseInt(prompt('分期期數（2–120）', F.instN > 1 ? F.instN : '')); if (n >= 2 && n <= 120) F.instN = n; }
   else F.instN = +v;
-  if (F.instN <= 1) { F.instFeeExpr = ''; F.instPerExpr = ''; F.instFirstExpr = ''; if (['ifee', 'iper', 'ifirst'].includes(F.active)) F.active = 'amt'; }
+  if (F.instN <= 1) { F.instFeeExpr = ''; F.instPerExpr = ''; F.instFirstExpr = ''; F.instAprExpr = ''; if (['ifee', 'iper', 'ifirst', 'iapr'].includes(F.active)) F.active = 'amt'; }
   redraw('add');
 }
 function setF(k, v){
@@ -1511,7 +1515,7 @@ function setF(k, v){
   if (k === 'accountId' || k === 'toAccountId') {
     const A = S.data.accounts;
     if (A[F.accountId]?.currency === A[F.toAccountId]?.currency) { F.toExpr = ''; if (F.active === 'to') F.active = 'amt'; }
-    if (A[F.accountId]?.type !== 'credit') { F.instN = 0; F.instFeeExpr = ''; F.instPerExpr = ''; F.instFirstExpr = ''; F.fxExpr = ''; F.nextBill = false; if (['ifee', 'iper', 'ifirst', 'fx'].includes(F.active)) F.active = 'amt'; }
+    if (A[F.accountId]?.type !== 'credit') { F.instN = 0; F.instFeeExpr = ''; F.instPerExpr = ''; F.instFirstExpr = ''; F.instAprExpr = ''; F.fxExpr = ''; F.nextBill = false; if (['ifee', 'iper', 'ifirst', 'iapr', 'fx'].includes(F.active)) F.active = 'amt'; }
   }
   redraw('add');
 }
@@ -1523,17 +1527,25 @@ function setProj(v){
   redraw('add');
 }
 function key(k){
-  const f = {to:'toExpr', fee:'feeExpr', ifee:'instFeeExpr', iper:'instPerExpr', ifirst:'instFirstExpr', fx:'fxExpr'}[F.active] || 'amtExpr';
-  let s = F[f]; const last = s.slice(-1);
+  const f = {to:'toExpr', fee:'feeExpr', ifee:'instFeeExpr', iper:'instPerExpr', ifirst:'instFirstExpr', iapr:'instAprExpr', fx:'fxExpr'}[F.active] || 'amtExpr';
+  let s = F[f] || ''; const last = s.slice(-1);
+  if (f === 'instAprExpr' && (OPS.test(k) || k === '%')) return;   // 年利率只輸入數字
   if (k === 'AC') s = '';
+  else if (k === '%') { if (!/[0-9.]$/.test(s)) return; s += '%'; }
+  else if (last === '%' && !OPS.test(k) && k !== '⌫') return;      // % 後面只能接運算符號
   else if (k === '⌫') s = s.slice(0, -1);
   else if (OPS.test(k)) { if (!s) return; s = OPS.test(last) ? s.slice(0, -1) + k : s + k; }
   else if (k === '.') { const seg = s.split(OPS).pop(); if (seg.includes('.')) return; s += seg === '' ? '0.' : '.'; }
   else if (k === '00') { const seg = s.split(OPS).pop(); if (!seg || seg === '0') return; s += '00'; }
   else { const seg = s.split(OPS).pop(); if (seg === '0') s = s.slice(0, -1) + k; else s += k; const dp = (s.split(OPS).pop().split('.')[1] || ''); if (dp.length > 2) return; }
   if (s.length > 40) return;
-  F[f] = s; redraw('add');
+  F[f] = s;
+  if (f === 'instPerExpr' || f === 'instFirstExpr') F.perAuto = false;
+  if (f === 'instAprExpr') F.perAuto = true;
+  redraw('add');
 }
+/* v2.28：年利率 → 每期金額（本息平均攤還，月利率＝年利率÷12，四捨五入到整數） */
+function aprPer(P, n, apr){ if (!(P > 0) || !(n > 1) || !(apr > 0)) return 0; const r = apr / 1200; return Math.round(P * r / (1 - Math.pow(1 + r, -n))); }
 function formBody(){
   const amt = evalExpr(F.amtExpr), A = S.data.accounts;
   if (!(amt > 0)) return toast('請輸入金額');
@@ -1574,6 +1586,7 @@ function saveTxn(){
     t.inst = {n, fee:feeIn, ...(keepPo ? {payoff:keepPo} : {})};
     if (per > 0) { const r = instCalc(t.amount, n, per, first, feeIn); if (r.err) { F.active = 'iper'; redraw('add'); return toast(r.err); }
       Object.assign(t.inst, {per, fee:r.fee}, first > 0 ? {first} : {}, r.auto ? {feeAuto:true} : {}); if (r.auto) autoFee = r.fee; }
+    if (evalExpr(F.instAprExpr) > 0) t.inst.apr = evalExpr(F.instAprExpr);
   }
   if (t.type !== 'transfer') P.lastCat[t.type] = t.catId;
   P.lastAcc = F.accountId; savePrefs();
