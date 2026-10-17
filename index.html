@@ -292,7 +292,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.30';
+const VERSION = 'v2.31';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -471,7 +471,7 @@ function putSettings(patch){
   S.settings = {...S.settings, ...patch};
   if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
   if (S.mode === 'cloud') { const st = S.settings; cloudWrite(L => L.collection('meta').doc('settings').set(clean(st))); bump(); }
-  else saveLocal();
+  else { saveLocal(); bump(); }
   applyTheme(); render();
 }
 
@@ -486,7 +486,15 @@ function cycDate(a, y, m){ y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; re
 function closeOf(a, date){ const d = pd(date), c = cycDate(a, d.getFullYear(), d.getMonth()); return date <= c ? c : cycDate(a, d.getFullYear(), d.getMonth() + 1); }
 function closeAdd(a, close, k){ const d = pd(close); return cycDate(a, d.getFullYear(), d.getMonth() + k); }
 /* 這筆消費算進哪一期帳單（打開「商店晚請款（算下期）」就再延一期）；沒有結帳日就是當天 */
-function billDate(t){ const a = S.data.accounts[t.accountId]; if (!hasCycle(a)) return t.date; const c = closeOf(a, t.date); return t.nextBill ? closeAdd(a, c, 1) : c; }
+/* v2.31：銀行入帳日＝逐筆填的入帳日，沒填就是刷卡日＋信用卡「請款天數」；入帳日落在哪一期就算哪一期 */
+const postDaysOf = a => Math.max(0, Math.min(15, +(a && a.postDays) || 0));
+function postOf(t){ const a = S.data.accounts[t.accountId]; return t.postDate || addD(t.date, postDaysOf(a)); }
+function billDate(t){ const a = S.data.accounts[t.accountId]; if (!hasCycle(a)) return t.date; const c = closeOf(a, postOf(t)); return t.nextBill && !t.postDate ? closeAdd(a, c, 1) : c; }
+/* 分期每期入帳日（每月幾號）：第一期＝刷卡日之後第一個「幾號」 */
+function dayOn(y, m, day){ y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return ds(new Date(y, m, Math.min(day, dim(y, m)))); }
+function instPost0(date, day){ const d = pd(date), c = dayOn(d.getFullYear(), d.getMonth(), day); return c > date ? c : dayOn(d.getFullYear(), d.getMonth() + 1, day); }
+/* 舊的「商店晚請款」勾選 → 每期入帳日＝結帳日隔天（結帳日 27 號以前才轉換，結果完全一樣） */
+const legacyPostDay = a => a && a.closeDay && a.closeDay <= 27 ? a.closeDay + 1 : 0;
 const instFee = t => (t.type === 'expense' && t.inst && t.inst.n > 1) ? (+t.inst.fee || 0) : 0;
 const fxFee = t => t.type === 'expense' ? (+t.fxFee || 0) : 0;   // 國外交易手續費（信用卡）
 const poExtra = po => po ? (+po.interest || 0) + (+po.penalty || 0) : 0;
@@ -500,6 +508,13 @@ function applyPayoff(ps, po, a){
 }
 let IP = {ver:-1, m:new Map()};
 const rd2 = v => Math.round(v * 100) / 100;
+/* v2.31：有年利率時，每期利息照本息平均攤還分（前面多、後面少，跟銀行一樣）；合計不變 */
+function aprFees(P, n, apr, pays){
+  if (!(apr > 0) || !pays || pays.length !== n) return null;
+  const r = apr / 1200, fs = []; let bal = P;
+  for (let k = 0; k < n; k++) { const i = k === n - 1 ? rd2(pays[k] - bal) : Math.round(bal * r); if (i < 0 || i > pays[k]) return null; fs.push(i); bal = rd2(bal - (pays[k] - i)); }
+  return fs;
+}
 /* 分期「每期金額（照銀行）」：有填就每期用銀行金額（首期可另填），合計跟總額的差：有填首期→最後一期補，沒填→首期補 */
 function instPays(tot, n, per, first){
   per = +per || 0; first = +first || 0; if (!(per > 0) || n < 2) return null;
@@ -521,8 +536,9 @@ function instPieces(t){
   const hit = IP.m.get(t); if (hit) return hit;
   const a = S.data.accounts[t.accountId], n = t.inst.n, out = [], fee = instFee(t);
   const pa = Math.floor(t.amount / n), pf = Math.floor(fee / n), first = hasCycle(a) ? billDate(t) : null, pays = instPays(t.amount + fee, n, t.inst.per, t.inst.first);
-  for (let k = 0; k < n; k++) { const fk = k === 0 ? fee - pf * (n - 1) : pf;
-    out.push({date:first ? closeAdd(a, first, k) : addM(t.date, k), k, amt:pays ? rd2(pays[k] - fk) : k === 0 ? t.amount - pa * (n - 1) : pa, fee:fk}); }
+  const pday = hasCycle(a) ? (+t.inst.postDay || 0) : 0, p0 = pday ? instPost0(t.date, pday) : null, af = pays && Math.abs(pays.reduce((x, y) => x + y, 0) - t.amount - fee) < 0.5 ? aprFees(t.amount, n, +t.inst.apr || 0, pays) : null;
+  for (let k = 0; k < n; k++) { const fk = af ? af[k] : k === 0 ? fee - pf * (n - 1) : pf, post = p0 ? (() => { const d = pd(p0); return dayOn(d.getFullYear(), d.getMonth() + k, pday); })() : null;
+    out.push({date:post ? closeOf(a, post) : first ? closeAdd(a, first, k) : addM(t.date, k), post, k, amt:pays ? rd2(pays[k] - fk) : k === 0 ? t.amount - pa * (n - 1) : pa, fee:fk}); }
   const r = applyPayoff(out, t.inst.payoff, a); IP.m.set(t, r); return r;
 }
 /* 帳單分期／舊分期（plans）：pieces 依信用卡結帳日入帳；amt＝本金、fee＝手續費 */
@@ -532,8 +548,8 @@ function planPieces(pl){
   const hit = IP.m.get(pl); if (hit) return hit;
   const a = S.data.accounts[pl.accountId], n = Math.max(1, +pl.n || 1), fee = +pl.fee || 0, tot = (+pl.principal || 0) + fee;
   const [fy, fm] = (pl.firstMonth || today().slice(0, 7)).split('-').map(Number), cd = a && a.closeDay ? a.closeDay : 1;
-  const per = Math.floor(tot / n), fper = Math.floor(fee / n), out = [], pays = pl.kind === 'legacy' ? null : instPays(tot, n, pl.per, pl.first);
-  for (let k = 0; k < n; k++) { const y = fy + Math.floor((fm - 1 + k) / 12), m = (fm - 1 + k) % 12, pf = k === 0 ? fee - fper * (n - 1) : fper, pt = pays ? pays[k] : k === 0 ? tot - per * (n - 1) : per;
+  const per = Math.floor(tot / n), fper = Math.floor(fee / n), out = [], pays = pl.kind === 'legacy' ? null : instPays(tot, n, pl.per, pl.first), af = pays ? aprFees(+pl.principal || 0, n, +pl.apr || 0, pays) : null;
+  for (let k = 0; k < n; k++) { const y = fy + Math.floor((fm - 1 + k) / 12), m = (fm - 1 + k) % 12, pf = af ? af[k] : k === 0 ? fee - fper * (n - 1) : fper, pt = pays ? pays[k] : k === 0 ? tot - per * (n - 1) : per;
     out.push({date:ds(new Date(y, m, Math.min(cd, dim(y, m)))), k, amt:pt - pf, fee:pf}); }
   const r = applyPayoff(out, pl.payoff, a); IP.m.set(pl, r); return r;
 }
@@ -587,8 +603,9 @@ function compute(){
       if (fx) flows.push({t, date:t.date, type:'expense', cat:FEE_CAT, amt:fx * r, o:fx, proj:t.projectId});
       if (t.inst && t.inst.n > 1) { let fe = 0;
         flows.push({t, date:t.date, type:'expense', cat:t.catId, amt:t.amount * r, o:t.amount, proj:t.projectId});
-        for (const p of instPieces(t)) fe += p.fee;
-        if (fe) flows.push({t, date:t.date, type:'expense', cat:FEE_CAT, amt:fe * r, o:fe, proj:t.projectId});
+        const byP = S.settings.feeByPeriod !== false;
+        for (const p of instPieces(t)) { fe += p.fee; if (byP && p.fee) flows.push({t, date:p.date, type:'expense', cat:FEE_CAT, amt:p.fee * r, o:p.fee, proj:t.projectId, k:p.k}); }
+        if (fe && !byP) flows.push({t, date:t.date, type:'expense', cat:FEE_CAT, amt:fe * r, o:fe, proj:t.projectId});
         tw[t.id] = {amt:t.amount * r, fee:(fe + fx) * r};
       } else { tw[t.id] = {amt:t.amount * r, fee:fx * r}; flows.push({t, date:t.date, type:'expense', cat:t.catId, amt:t.amount * r, o:t.amount, proj:t.projectId}); }
     }
@@ -612,6 +629,7 @@ function compute(){
     const a = A[pl.accountId]; if (!a) continue;
     const r = a.currency === 'TWD' ? 1 : avg[a.id];
     const fee = planPieces(pl).reduce((x, p) => x + p.fee, 0), date = pl.kind === 'legacy' ? (pl.payoff && pl.payoff.date) : planOffsetDate(pl);
+    if (S.settings.feeByPeriod !== false && pl.kind !== 'legacy') { for (const p of planPieces(pl)) if (p.fee) flows.push({t:{id:'plan_' + pl.id, type:'expense', date:p.date, amount:p.fee, catId:FEE_CAT, note:(pl.name || '帳單分期') + ' 手續費', accountId:a.id, plan:pl.id, createdAt:0}, date:p.date, type:'expense', cat:FEE_CAT, amt:p.fee * r, o:p.fee, proj:null, k:p.k}); continue; }
     if (fee && date) flows.push({t:{id:'plan_' + pl.id, type:'expense', date, amount:fee, catId:FEE_CAT, note:(pl.name || '帳單分期') + ' 手續費', accountId:a.id, plan:pl.id, createdAt:0}, date, type:'expense', cat:FEE_CAT, amt:fee * r, o:fee, proj:null, k:-1});
   }
   for (const f of flows) if (f.k !== undefined) days.add(f.date);
@@ -645,8 +663,20 @@ function cardInfo(a){
   if (CI_MEMO.m[a.id]) return CI_MEMO.m[a.id];
   return (CI_MEMO.m[a.id] = cardInfoRaw(a));
 }
-/* 算到某個結帳日為止：stmt＝帳單結算（負＝要繳）、paid＝結帳後繳款、post＝結帳後新增（扣退款回饋）、unbilled＝分期還沒入帳 */
+/* 算到某個結帳日為止：stmt＝帳單結算（負＝要繳）、paid＝結帳後繳款、post＝結帳後新增（扣退款回饋）、unbilled＝分期還沒入帳
+   v2.31：之前有哪一期「以帳單為準」，就從那期的銀行數字接著算（raw＝App 純粹照紀錄算、adj＝銀行跟 App 的差，不再一路帶下去） */
+let CYM = {ver:-1, m:new Map()};
+function ovMap(a){ const h = {...(a.stmtOverrides || {})}; if (a.stmtOverride && a.stmtOverride.close && (h[a.stmtOverride.close] === undefined || h[a.stmtOverride.close] === null)) h[a.stmtOverride.close] = +a.stmtOverride.amount || 0; for (const k of Object.keys(h)) if (h[k] === null || h[k] === undefined) delete h[k]; return h; }
+function anchorOf(a, close){ const h = ovMap(a); let k = ''; for (const x of Object.keys(h)) if (x < close && x > k) k = x; return k ? {close:k, amt:+h[k] || 0} : null; }
 function cycleCalc(a, close, next){
+  if (CYM.ver !== VER) CYM = {ver:VER, m:new Map()};
+  const key = a.id + '|' + close + '|' + (next || ''), hit = CYM.m.get(key); if (hit) return hit;
+  const s = cycleRaw(a, close, next), an = anchorOf(a, close), adj = an ? -an.amt - cycleRaw(a, an.close).stmt : 0;
+  const r = {...s, raw:s.stmt, stmt:s.stmt + adj, adj, anchor:an ? an.close : null}; CYM.m.set(key, r); return r;
+}
+function cycleRaw(a, close, next){
+  if (CYM.ver !== VER) CYM = {ver:VER, m:new Map()};
+  const key = 'raw|' + a.id + '|' + close + '|' + (next || ''), hit = CYM.m.get(key); if (hit) return hit;
   const c = compute(); let stmt = +a.init || 0, paid = 0, post = 0, unbilled = 0, nextInst = 0;
   for (const x of c.list) {
     if (x.type === 'expense' && x.accountId === a.id && x.inst && x.inst.n > 1) {
@@ -665,8 +695,10 @@ function cycleCalc(a, close, next){
     if (planOffsetDate(pl) <= close) stmt += +pl.principal || 0; else post -= +pl.principal || 0;
     for (const p of planPieces(pl)) { const v = p.amt + p.fee; if (p.date <= close) stmt -= v; else if (p.payoff) post += v; else { unbilled += v; if (next && p.date <= next) nextInst += v; } }
   }
-  return {stmt, paid, post, unbilled, nextInst};
+  const r = {stmt, paid, post, unbilled, nextInst}; CYM.m.set(key, r); return r;
 }
+/* v2.31 可用額度：銀行只扣本金，還沒入帳的分期利息不扣 */
+function unbilledFee(a, close){ let f = 0; for (const x of cardPieces(a)) if (x.p.date > close && !x.p.payoff) f += x.p.fee; return f; }
 /* 「以帳單為準」每期分開記（stmtOverrides[結帳日]），舊資料的 stmtOverride 也讀得到 */
 function ovOf(a, close){ const h = a.stmtOverrides || {}; if (h[close] !== undefined && h[close] !== null) return +h[close] || 0; return a.stmtOverride && a.stmtOverride.close === close ? +a.stmtOverride.amount || 0 : null; }
 /* 某期帳單的繳款＝結帳日隔天到下一個結帳日之間轉進這張卡的錢 */
@@ -675,19 +707,19 @@ function curClose(a){ const td = today(), c = closeOf(a, td); return c > td ? cl
 function dueOf(a, close){ const d = pd(close), y = d.getFullYear(), m = d.getMonth() + (a.dueDay > a.closeDay ? 0 : 1); const yy = y + Math.floor(m / 12), mm = m % 12; return ds(new Date(yy, mm, Math.min(a.dueDay, dim(yy, mm)))); }
 function cardInfoRaw(a){
   const td = today(), close = curClose(a), next = closeAdd(a, close, 1), due = dueOf(a, close), c = compute(), s = cycleCalc(a, close, next);
-  const auto = Math.max(0, -s.stmt), autoRemain = Math.max(0, auto - s.paid);
+  const auto = Math.max(0, -s.stmt), rawRemain = Math.max(0, Math.max(0, -s.raw) - s.paid);
   let owed = auto, manual = false;
   const ov0 = ovOf(a, close); if (ov0 !== null) { owed = ov0; manual = true; }
   const remain = Math.max(0, owed - s.paid), bal = c.bal[a.id] || 0, debt = Math.max(0, -bal);
   /* 三格一定加起來＝待繳總額：先各自算（負的當 0），多出來的錢（回饋、退款、多繳、結帳前預繳）依序抵 本期 → 下期 → 分期；不夠的（上期沒繳清）加到下期 */
-  let diff = autoRemain - remain; if (debt < 1) diff = 0;
+  let diff = rawRemain - remain; if (debt < 1) diff = 0;
   let r = remain, p = s.post + s.nextInst, u = s.unbilled - s.nextInst, ex = 0;
   if (p < 0) { ex -= p; p = 0; } if (u < 0) { ex -= u; u = 0; }
   ex += r + p + u + diff - debt;
   const off = {r:0, p:0, u:0}; let miss = 0;
   if (ex > 0.5) { for (const k of ['r', 'p', 'u']) { const cur = k === 'r' ? r : k === 'p' ? p : u, t = Math.min(cur, ex); off[k] = t; ex -= t; if (k === 'r') r -= t; else if (k === 'p') p -= t; else u -= t; } }
   else if (ex < -0.5) { miss = -ex; p += miss; }
-  return {close, next, due, owed, paid:s.paid, remain:r, unbilled:u, post:p, newPost:s.post, nextInst:s.nextInst, off, miss, carry:miss - off.p, debt, diff, manual, auto, left:diffD(due, td), over:bal > 0 ? bal : 0, avail:a.limit ? a.limit + Math.min(0, bal) + Math.max(0, bal) : null};
+  return {close, next, due, owed, paid:s.paid, remain:r, unbilled:u, post:p, newPost:s.post, nextInst:s.nextInst, off, miss, carry:miss - off.p, debt, diff, manual, auto, left:diffD(due, td), over:bal > 0 ? bal : 0, adj:s.adj, anchor:s.anchor, avail:a.limit ? Math.max(0, a.limit + Math.min(0, bal + unbilledFee(a, close))) : null};
 }
 
 /* ---------- theme ---------- */
@@ -818,7 +850,8 @@ function pieceRow(r, opt = {}){
   if (t.plan) {
     const pl = S.data.plans[t.plan], fm = catMain(catOf(FEE_CAT));
     title = (pl && pl.name) || (pl && pl.kind === 'legacy' ? '舊分期' : '帳單分期'); icon = fm ? fm.icon : 'bank'; color = fm ? fm.color : '#6C7A89'; click = `openPlan('${t.plan}')`;
-    sub.push(pl && pl.kind === 'legacy' ? '提前結清利息／違約金' : `帳單分期手續費（${pl ? pl.n : '?'} 期合計${pl && pl.payoff ? '・含結清利息' : ''}）`);
+    const pp = pl && r.k >= 0 ? planPieces(pl)[r.k] : null;
+    sub.push(pl && pl.kind === 'legacy' ? '提前結清利息／違約金' : pp ? `帳單分期手續費 ${pp.payoff ? '提前結清' : `第 ${r.k + 1}/${pl.n} 期`}` : `帳單分期手續費（${pl ? pl.n : '?'} 期合計${pl && pl.payoff ? '・含結清利息' : ''}）`);
   } else {
     const p = instPieces(t)[r.k], cat = catOf(t.catId), m = catMain(cat);
     const fm = catMain(catOf(FEE_CAT)), useFee = r.fee && fm;
@@ -895,7 +928,7 @@ function viewHome(){
           <span class="tx2">${cur && T.remain > 0 ? `每天可花 ${twd(T.remain / left)}` : `預算 ${twd(T.avail)}`}</span></div>${bbar(T.pct)}</div>`; })() : ''}</div>
     ${goalHome()}<div class="per">${perCell('本週', wsum, `openRange('${ws}','${addD(ws, 6)}')`, wPrev.exp && wNow.exp ? cmpTxt(pct(wNow.exp, wPrev.exp), '比上週') : '')}${perCell(`${m+1}月`, ms, `goRp('trend','month',${y},${m})`, mPrev.exp && mNow.exp ? cmpTxt(pct(mNow.exp, mPrev.exp), '比上月') : '')}${perCell(`${y}年`, ysum, `goRp('trend','year',${y},${m})`)}</div>
     <div class="sec"><h3>${md(sel)} ${wdName(sel)}${sel === td ? '・今天' : ''}</h3><span class="sm"><span class="exp">${twd(-dsum.exp)}</span>　<span class="inc">${twd(dsum.inc, true)}</span></span></div>
-    <div class="list">${list.length || pcs.length ? list.map(t => txnRow(t)).join('') + pcs.map(r => pieceRow(r)).join('') : `<div class="empty">這天還沒有紀錄<br><button style="color:var(--acc);margin-top:8px;font-weight:600" onclick="openAdd()">＋ 記一筆</button></div>`}</div>`;
+    <div class="list">${list.length || pcs.length ? list.map(t => txnRow(t)).join('') + pcs.map(r => pieceRow(r)).join('') : `<div class="empty">這天沒消費 👍<br><button style="color:var(--acc);margin-top:8px;font-weight:600" onclick="openAdd()">＋ 記一筆</button></div>`}</div>`;
 }
 function goRp(seg, per, y, m, type){ const r = S.ui.rp; S.ui.rp = {...r, seg, per:per || r.per, y:y ?? r.y, m:m ?? r.m, type:type || r.type}; go('reports'); }
 function openRange(from, to){ SR = {q:'', type:'', acc:'', cat:'', proj:'', from, to, min:'', max:'', limit:100, more:true}; openSearch(); }
@@ -983,8 +1016,8 @@ function viewAcct(){
         ...Object.values(S.data.plans || {}).filter(pl => pl.accountId === a.id && !pl.payoff).map(pl => planStatus(pl, ci))].filter(st => st.left > 0);
       const mx = live.reduce((m, st) => st.left > m.left ? st : m, {left:0, last:''}), sum = live.length ? `${live.length} 筆分期・最長剩 ${mx.left} 期（到 ${mx.last.slice(0, 7).replace('-', '/')}）・` : '';
       return ln('分期未入帳', ci.unbilled, '', ci.unbilled >= 1 ? `openFuture('${a.id}')` : '', `${sum}${md(closeAdd(a, ci.next, 1))} 以後的分期${ci.off.u >= 1 ? `・已預繳抵扣 ${f(ci.off.u)}` : ''}`); })()}
-    ${Math.abs(ci.diff) >= 1 && !ci.over ? ln('帳單與 App 推算差額', ci.diff, 'tx2', `openStmt('${a.id}','${ci.close}')`, `你輸入的帳單 ${f(ci.owed)}，App 算 ${f(ci.auto)}。通常是漏記回饋／退款、手續費或日期，點這裡逐筆對照`) : ''}
-    ${a.limit ? `<div class="sm tx2" style="padding-top:8px;border-top:1px solid var(--line)">額度 ${f(a.limit)}・可用 ${f(Math.max(0, a.limit + Math.min(0, b)))}</div>` : ''}
+    ${Math.abs(ci.diff) >= 1 && !ci.over ? ln(ci.manual ? '帳單與 App 推算差額' : '銀行與 App 紀錄累計差', ci.diff, 'tx2', `openStmt('${a.id}','${ci.close}')`, ci.manual ? `你輸入的帳單 ${f(ci.owed)}，App 算 ${f(ci.auto)}。通常是漏記回饋／退款、手續費或日期，點這裡逐筆對照` : `${md(ci.anchor)} 那期以銀行帳單為準後，帳單從銀行數字接著算；App 紀錄本身還差 ${f(-ci.adj)}（漏記或入帳時間差）。對完可用「校正目前欠款」補齊`) : ''}
+    ${a.limit ? `<div class="sm tx2" style="padding-top:8px;border-top:1px solid var(--line)">額度 ${f(a.limit)}・可用 ${f(ci.avail)}${unbilledFee(a, ci.close) >= 1 ? `（未入帳分期利息 ${f(unbilledFee(a, ci.close))} 不扣額度）` : ''}</div>` : ''}
     <div class="two" style="margin-top:12px"><button class="btn sec2" style="padding:10px" onclick="setStmt('${a.id}')">${ci.manual ? '修改帳單金額' : '以帳單為準'}</button><button class="btn sec2" style="padding:10px" onclick="openPlan(null,'${a.id}')">＋ 帳單分期</button></div>
     <button class="btn sec2" style="padding:10px;margin-top:8px" onclick="openHist('${a.id}')">歷史帳單（已繳紀錄）</button>
     <div class="hint" style="margin:10px 0 0">繳卡費：記一筆「轉帳」，從銀行帳戶轉入這張卡</div></div>`; }
@@ -1039,6 +1072,26 @@ function instSection(a, ci){
         <span class="amt">${fmt(st.remain + st.curAmt, a.currency)}<small>到 ${st.last.slice(0, 7).replace('-', '/')}</small></span></button>`; }).join('')}
     ${ins.length > SHOW ? `<button class="row" style="justify-content:center;color:var(--acc);font-weight:600" onclick="S.ui.instOpen=${open ? 'null' : `'${a.id}'`};render()">${open ? '收合' : `顯示全部 ${ins.length} 筆`}</button>` : ''}</div>`;
 }
+/* v2.31 帳單「折抵」：輸入本期銀行折抵總額 → 自動記一筆「被動收入 > 回饋」在結帳日（已手動記的回饋會先扣掉） */
+function rebateCat(){
+  const C = S.data.categories, hit = Object.values(C).find(c => c.type === 'income' && c.name === '回饋' && !c.hidden) || Object.values(C).find(c => c.type === 'income' && c.name === '回饋');
+  if (hit) return hit.id;
+  const par = Object.values(C).find(c => c.type === 'income' && !c.parent && c.name === '被動收入') || Object.values(C).find(c => c.type === 'income' && !c.parent);
+  const id = 'c_' + uid(), sib = Object.values(C).filter(c => c.parent === par.id).length;
+  put('categories', {id, type:'income', name:'回饋', icon:par.icon, color:par.color, parent:par.id, order:sib, hidden:false}, true);
+  return id;
+}
+function openRebate(aid, close){
+  const a = S.data.accounts[aid], prev = closeAdd(a, close, -1), cat = rebateCat();
+  const inP = compute().list.filter(t => t.type === 'income' && t.accountId === aid && t.date > prev && t.date <= close);
+  const auto = inP.find(t => t.rebateFor === close), other = inP.filter(t => t !== auto && t.catId === cat).reduce((x, t) => x + t.amount, 0), refund = inP.filter(t => t !== auto && t.catId !== cat).reduce((x, t) => x + t.amount, 0);
+  const v = prompt(`${close.replace(/-/g, '/')} 帳單的「回饋折抵」總額是多少？（照銀行帳單）\n${other ? `已記的回饋 ${nf(other)} 會先扣掉，只補差額。\n` : ''}${refund ? `消費退款 ${nf(refund)} 另外算，不用加進來。\n` : ''}留空或 0＝取消自動記的那筆`, auto ? auto.amount + other : other || '');
+  if (v === null) return;
+  const n = parseFloat(String(v).replace(/,/g, '')) || 0, need = rd2(n - other);
+  if (need <= 0) { if (auto) del('txns', auto.id); toast(need < 0 ? `已記的回饋已超過 ${nf(n)}，請檢查` : '已取消自動折抵'); }
+  else put('txns', {...(auto || {}), id:auto ? auto.id : 't_' + uid(), type:'income', amount:need, accountId:aid, catId:cat, date:close, note:'回饋折抵（帳單）', rebateFor:close, projectId:null, createdAt:auto ? auto.createdAt : Date.now()}, true);
+  render(); redraw('stmt'); redraw('debt'); if (need > 0) toast(`已記回饋 ${nf(need)}（${md(close)}）`);
+}
 /* ---------- 本期帳單明細 ---------- */
 let STM = null;
 function openStmt(aid, close){ STM = {aid, close}; openLayer('stmt', renderStmt, 'full'); }
@@ -1050,7 +1103,7 @@ function stmtData(a, close){
       const fx = fxFee(x), bd = billDate(x); if (fx && bd > prev && bd <= close) it.buy.push({t:x, v:fx, fx:true}); continue; }
     const d = delta(x, a.id); if (!d) continue;
     const when = x.type === 'expense' ? billDate(x) : x.date; if (when <= prev || when > close) continue;
-    if (x.type === 'expense' || d < 0) it.buy.push({t:x, v:-d});
+    if (x.type === 'expense' || d < 0) it.buy.push({t:x, v:-d, post:x.type === 'expense' ? postOf(x) : x.date});
     else if (x.type === 'income') it.refund.push({t:x, v:d});
     else it.pay.push({t:x, v:d});
   }
@@ -1060,7 +1113,8 @@ function stmtData(a, close){
     planPieces(pl).forEach(p => { if (p.date > prev && p.date <= close) it.inst.push({pl, p, v:p.amt + p.fee}); });
   }
   const sum = k => it[k].reduce((x, i) => x + i.v, 0);
-  return {prev, it, sum, prevOwed:-cycleCalc(a, prev).stmt, total:-cycleCalc(a, close).stmt};
+  const ovp = ovOf(a, prev);
+  return {prev, it, sum, prevOwed:ovp !== null ? ovp : -cycleCalc(a, prev).stmt, prevBank:ovp !== null, total:-cycleCalc(a, close).stmt};
 }
 function renderStmt(){
   const a = S.data.accounts[STM.aid], close = STM.close, cur = a.currency, d = stmtData(a, close), cc = curClose(a), f = v => fmt(v, cur);
@@ -1069,25 +1123,27 @@ function renderStmt(){
   const line = (label, v, sign, cls = '') => `<div style="display:flex;justify-content:space-between;padding:4px 0"><span class="tx2">${label}</span><b class="${Math.abs(v) >= 0.5 ? cls : 'tx2'}">${Math.abs(v) >= 0.5 ? sign : ''}${f(v)}</b></div>`;
   const row = (x, label) => { const t = x.t, pl = x.pl, click = pl ? `openPlan('${pl.id}')` : `openAdd('${t.id}')`;
     let title, sub = [];
-    if (x.p) { if (pl) { title = pl.name || '帳單分期'; sub.push(x.p.payoff ? '提前結清' : `${x.p.k + 1}/${pl.n} 期`); } else { title = catOf(t.catId)?.name || '分期'; sub.push(x.p.payoff ? `提前結清（${t.inst.n} 期）` : `${x.p.k + 1}/${t.inst.n} 期`); if (t.note) sub.push(t.note.split('\n')[0]); sub.push('刷卡 ' + md(t.date)); } }
+    if (x.p) { if (pl) { title = pl.name || '帳單分期'; sub.push(x.p.payoff ? '提前結清' : `${x.p.k + 1}/${pl.n} 期`); } else { title = catOf(t.catId)?.name || '分期'; sub.push(x.p.payoff ? `提前結清（${t.inst.n} 期）` : `${x.p.k + 1}/${t.inst.n} 期`); if (t.note) sub.push(t.note.split('\n')[0]); sub.push('刷卡 ' + md(t.date)); if (x.p.post) sub.push('入帳 ' + md(x.p.post)); } }
     else if (pl) { title = pl.name || '帳單分期'; sub.push('整期轉分期，從這期帳單移出'); }
-    else { title = t.type === 'transfer' ? `${S.data.accounts[t.accountId]?.name || '?'} → ${S.data.accounts[t.toAccountId]?.name || '?'}` : (catOf(t.catId)?.name || '未分類'); if (t.note) sub.push(t.note.split('\n')[0]); sub.unshift(md(t.date)); if (t.nextBill) sub.push('下期入帳'); }
+    else { title = t.type === 'transfer' ? `${S.data.accounts[t.accountId]?.name || '?'} → ${S.data.accounts[t.toAccountId]?.name || '?'}` : (catOf(t.catId)?.name || '未分類'); if (t.store) title = t.store + '・' + title; if (t.note) sub.push(t.note.split('\n')[0]); sub.unshift(x.post && x.post !== t.date ? `刷 ${md(t.date)}・入帳 ${md(x.post)}` : md(t.date)); if (t.nextBill && !t.postDate) sub.push('下期入帳'); if (t.rebateFor) sub.push('本期折抵'); }
     return `<button class="row" onclick="${click}"><span class="mid"><b>${esc(title)}</b>${sub.length ? `<small>${esc(sub.join(' · '))}</small>` : ''}</span><span class="amt">${label}${f(x.v)}</span></button>`; };
-  const sec = (k, title, sign) => d.it[k].length ? `<div class="sec"><h3>${title} <span class="sm tx2" style="font-weight:400">${d.it[k].length} 筆</span></h3><span class="sm b">${sign}${f(d.sum(k))}</span></div><div class="list">${d.it[k].sort((x, y) => ((x.p ? x.p.date : x.t ? x.t.date : '') < (y.p ? y.p.date : y.t ? y.t.date : '') ? -1 : 1)).map(x => row(x, sign)).join('')}</div>` : '';
+  const sec = (k, title, sign) => d.it[k].length ? `<div class="sec"><h3>${title} <span class="sm tx2" style="font-weight:400">${d.it[k].length} 筆</span></h3><span class="sm b">${sign}${f(d.sum(k))}</span></div><div class="list">${d.it[k].sort((x, y) => { const kx = x.p ? (x.p.post || x.t?.date || x.p.date) : x.post || (x.t ? x.t.date : ''), ky = y.p ? (y.p.post || y.t?.date || y.p.date) : y.post || (y.t ? y.t.date : ''); return kx < ky ? -1 : kx > ky ? 1 : 0; }).map(x => row(x, sign)).join('')}</div>` : '';
   const far = close > closeAdd(a, cc, 1), future = close > cc, empty = !Object.values(d.it).some(l => l.length);
   return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('stmt')">${ic('left',24)}</button><h2>${esc(a.name)} 帳單</h2><span style="width:40px"></span></div>
     <div class="rbar"><span class="sm tx2">${md(addD(d.prev, 1))} ～ ${md(close)}</span><div class="nav2"><button onclick="stmtShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="openYM('stmt')">${close.slice(0, 7).replace('-', '/')} 結帳 ▾</span><button onclick="stmtShift(1)" ${close > cc && close >= lastPieceClose(a) ? 'disabled style="opacity:.3"' : ''}>${ic('right',20)}</button></div></div>
     <div class="fscroll"><div class="card">
-      ${far ? '' : line('上期帳單', d.prevOwed, '')}
+      ${far ? '' : line(d.prevBank ? '上期帳單（銀行）' : '上期帳單', d.prevOwed, '')}
       ${far ? '' : line('本期繳款', d.sum('pay'), '−', 'inc')}${line('本期消費', d.sum('buy'), '＋', 'exp')}${line('本期分期', d.sum('inst'), '＋', 'exp')}
-      ${d.it.refund.length ? line('退款・回饋', d.sum('refund'), '−', 'inc') : ''}${d.it.plan.length ? line('轉帳單分期', d.sum('plan'), '−', 'inc') : ''}
+      ${far ? '' : `<div class="tap" onclick="openRebate('${a.id}','${close}')">${line('折抵（回饋・退款）✎', d.sum('refund'), '−', 'inc')}</div>`}${d.it.plan.length ? line('轉帳單分期', d.sum('plan'), '−', 'inc') : ''}
       <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>${future ? (close > closeAdd(a, cc, 1) ? '預估（目前已知的分期）' : '目前累計（尚未結帳）') : '本期應繳'}</span><b style="font-size:22px">${far ? f(d.sum('inst') + d.sum('buy') - d.sum('refund')) : d.total < 0 ? '溢繳 ' + f(-d.total) : f(d.total)}</b></div>
-      ${ov !== null ? `<div style="display:flex;justify-content:space-between;padding-top:6px"><span class="tx2">銀行帳單</span><b>${f(ov)}</b></div><div style="display:flex;justify-content:space-between"><span class="tx2">與帳單差額</span><b class="${Math.abs(ov - d.total) >= 1 ? 'exp' : ''}">${f(ov - d.total)}</b></div>` : ''}
+      ${ov !== null ? `<div style="display:flex;justify-content:space-between;padding-top:6px"><span class="tx2">銀行帳單</span><b>${f(ov)}</b></div><div style="display:flex;justify-content:space-between"><span class="tx2">${d.prevBank ? '本期新增差' : '與帳單差額'}</span><b class="${Math.abs(ov - d.total) >= 1 ? 'exp' : ''}">${f(ov - d.total)}</b></div>
+        <div class="sm tx2">${d.prevBank ? '上期已填銀行帳單，上期帶入差＝0，這是本期自己的差（消費、分期、折抵）' : '上期沒填銀行帳單，差額可能含上期帶入；上期也填就能分開看'}</div>` : ''}
+      ${!future ? `<button class="sm" style="display:block;margin:8px 0 0 auto;color:var(--acc);font-weight:600" onclick="setStmt('${a.id}','${close}')">${ov !== null ? '修改銀行帳單金額' : '以銀行帳單為準…'}</button>` : ''}
       ${!future ? `<div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:1px solid var(--line)"><span class="tx2">這期已繳／抵扣${pays.length ? `（${pays.map(t => md(t.date)).join('、')}）` : ''}</span><b class="inc">${f(paid)}</b></div>
         <div style="display:flex;justify-content:space-between;padding-top:4px"><span class="tx2">${unp >= 1 ? (close === cc ? `未繳（${md(dueOf(a, close))} 截止）` : '未繳（併入下期）') : '狀態'}</span><b class="${unp >= 1 ? 'exp' : 'inc'}">${unp >= 1 ? f(unp) : '✓ 繳清'}</b></div>` : ''}</div>
       ${sec('inst', '本期分期', '')}${sec('buy', '本期消費', '')}${sec('refund', '退款・回饋', '−')}${sec('pay', '繳款', '−')}${sec('plan', '轉帳單分期', '−')}
       ${empty ? '<div class="empty">這期沒有紀錄</div>' : ''}
-      <div class="hint">上期帳單 − 繳款 ＋ 消費 ＋ 分期 − 退款回饋 − 轉分期 ＝ 本期應繳。對照銀行帳單，金額不同時點進去修改那筆。</div><div style="height:30px"></div></div></div>`;
+      <div class="hint">上期帳單 − 繳款 ＋ 消費 ＋ 分期 − 折抵 − 轉分期 ＝ 本期應繳。明細依銀行入帳日排序；金額不同時點進去修改那筆。</div><div style="height:30px"></div></div></div>`;
 }
 /* ---------- 分期預估：之後每一期帳單會有多少分期 ---------- */
 function cardPieces(a){
@@ -1118,8 +1174,9 @@ function renderHist(aid){
   const first = list.find(t => t.accountId === aid || t.toAccountId === aid), start = first ? closeOf(a, first.date) : cc;
   const rows = []; let c = cc;
   for (let i = 0; i < S.ui.histN && c >= start; i++, c = closeAdd(a, c, -1)) {
-    const auto = -cycleCalc(a, c).stmt, ov = ovOf(a, c), bill = ov !== null ? ov : Math.max(0, auto), pays = paysFor(a, c), paid = pays.reduce((x, t) => x + (t.toAmount || t.amount), 0), un = c === cc ? cardInfo(a).remain : bill - paid;
-    rows.push(`<button class="row" onclick="openStmt('${aid}','${c}')"><span class="mid"><b>${c.slice(0, 7).replace('-', '/')} 帳單 <span class="sm" style="font-weight:400">${f(bill)}</span>${ov !== null && Math.abs(ov - Math.max(0, auto)) >= 1 ? ` <span class="sm tx2" style="font-weight:400">（App 推算 ${f(Math.max(0, auto))}）</span>` : ''}</b>
+    const auto = -cycleCalc(a, c).stmt, ov = ovOf(a, c), bill = ov !== null ? ov : Math.max(0, auto), pays = paysFor(a, c), paid = pays.reduce((x, t) => x + (t.toAmount || t.amount), 0), un = c === cc ? cardInfo(a).remain : bill - paid, dv = ov !== null ? ov - auto : null;
+    rows.push(`<button class="row" onclick="openStmt('${aid}','${c}')"><span class="mid"><b>${c.slice(0, 7).replace('-', '/')} 帳單 <span class="sm" style="font-weight:400">${f(bill)}</span></b>
+      <small>App ${f(auto)}・銀行 ${ov !== null ? f(ov) : '未填'}${dv !== null ? `・<span class="${Math.abs(dv) >= 1 ? 'exp' : 'inc'}">差 ${Math.abs(dv) >= 1 ? f(dv) : '0 ✓'}</span>` : ''}</small>
       <small>${md(c)} 結帳・已繳 ${f(paid)}${pays.length ? '（' + pays.map(t => md(t.date)).join('、') + '）' : ''}</small></span>
       <span class="amt ${un >= 1 ? 'exp' : 'inc'}">${un >= 1 ? f(un) : '✓'}<small>${un >= 1 ? (c === cc ? md(dueOf(a, c)) + ' 截止' : '併入下期') : bill - paid <= -1 ? '多繳 ' + f(-un) : '繳清'}</small></span></button>`);
   }
@@ -1128,7 +1185,7 @@ function renderHist(aid){
     <div class="fscroll"><div class="card mt0"><div class="kv">${Object.entries(yrs).sort((x, y) => y[0] < x[0] ? -1 : 1).slice(0, 4).map(([y, v]) => `<div><small>${y} 年已繳</small><b>${f(v)}</b></div>`).join('') || '<div><small>已繳</small><b>$0</b></div>'}</div></div>
     <div class="list">${rows.join('')}</div>
     ${c >= start ? `<div style="margin:12px 16px"><button class="btn sec2" onclick="S.ui.histN+=12;redraw('hist')">顯示更早</button></div>` : ''}
-    <div class="hint">已繳＝結帳後到下一次結帳之間，轉進這張卡的錢。點任一期看那期明細。</div><div style="height:30px"></div></div></div>`;
+    <div class="hint">已繳＝結帳後到下一次結帳之間，轉進這張卡的錢。App＝照紀錄算（前面有填銀行帳單的話，從那期銀行數字接著算）；銀行＝你在那期填的帳單金額。點任一期看明細、填銀行帳單。</div><div style="height:30px"></div></div></div>`;
 }
 /* ---------- 待繳明細：本期未繳／下期待繳／分期未入帳，一頁攤開 ---------- */
 function openDebt(aid){ openLayer('debt', () => renderDebt(aid), 'full'); }
@@ -1204,14 +1261,16 @@ function cancelPayoff(){
   if (PO.kind === 'plan') { const x = {...o}; delete x.payoff; put('plans', x, true); } else { const i = {...o.inst}; delete i.payoff; put('txns', {...o, inst:i}, true); }
   closeLayer('po'); redraw('add'); redraw('plan'); render(); toast('已還原分期');
 }
-function setStmt(aid){
+function setStmt(aid, close){
   const a = S.data.accounts[aid], ci = cardInfo(a); if (!ci) return toast('請先設定結帳日、繳款截止日');
-  const v = prompt(`${md(ci.close)} 結帳的這一期，銀行帳單「本期應繳」是多少？\n（留空＝改回 App 自動推算）`, ci.manual ? ci.owed : '');
+  close = close || ci.close; const cur = ovOf(a, close);
+  const v = prompt(`${close.replace(/-/g, '/')} 結帳的這一期，銀行帳單「本期應繳」是多少？\n（溢繳就填負數；留空＝改回 App 自動推算）\n填了之後，下一期起從這個銀行數字接著算，舊的差額不會再帶下去。`, cur !== null ? cur : '');
   if (v === null) return;
   const n = parseFloat(String(v).replace(/,/g, ''));
-  const h = {...(a.stmtOverrides || {})}; if (a.stmtOverride && a.stmtOverride.close && h[a.stmtOverride.close] === undefined) h[a.stmtOverride.close] = +a.stmtOverride.amount || 0;
-  if (v.trim() === '' || isNaN(n)) delete h[ci.close]; else h[ci.close] = n;
-  put('accounts', {...a, stmtOverrides:h, stmtOverride:v.trim() === '' || isNaN(n) ? null : {close:ci.close, amount:n}});
+  const h = ovMap(a);
+  if (v.trim() === '' || isNaN(n)) delete h[close]; else h[close] = n;
+  put('accounts', {...a, stmtOverrides:h, stmtOverride:null});
+  redraw('stmt'); redraw('hist');
   toast(v.trim() === '' ? '已改回自動推算' : '已以帳單金額為準');
 }
 let PF = null;
@@ -1258,7 +1317,7 @@ function amShift(n){ let {y, m} = S.ui.am; m += n; if (m < 0) { m = 11; y--; } i
 function openAcctForm(id){
   const a = id ? S.data.accounts[id] : null;
   AF = a ? {...a, inNW: a.inNW !== false, initInput: a.type === 'credit' ? String(-(a.init || 0)) : String(a.init || 0)} :
-    {id:null, name:'', type:'bank', currency:'TWD', initInput:'0', initRate:'', limit:'', closeDay:'', dueDay:'', color:PALETTE[12], archived:false, inNW:true};
+    {id:null, name:'', type:'bank', currency:'TWD', initInput:'0', initRate:'', limit:'', closeDay:'', dueDay:'', postDays:'2', color:PALETTE[12], archived:false, inNW:true};
   openLayer('acf', renderAcctForm, 'btm');
 }
 function renderAcctForm(){
@@ -1272,7 +1331,9 @@ function renderAcctForm(){
     ${f.id ? `<div class="fld"><label>校正${cr ? '目前欠款' : '目前餘額'}（填實際數字，自動回推初始值；不改請留空）</label><input inputmode="decimal" value="${esc(f.calib || '')}" placeholder="目前 ${cr ? fmt(Math.max(0, -(compute().bal[f.id] || 0)), f.currency) : fmt(compute().bal[f.id] || 0, f.currency)}" oninput="AF.calib=this.value"></div>` : ''}
     ${cr ? `<div class="two"><div class="fld"><label>結帳日（每月幾號）</label><input inputmode="numeric" value="${esc(f.closeDay)}" oninput="AF.closeDay=this.value" placeholder="例：5"></div>
       <div class="fld"><label>繳款截止日</label><input inputmode="numeric" value="${esc(f.dueDay)}" oninput="AF.dueDay=this.value" placeholder="例：20"></div></div>
-      <div class="fld"><label>信用額度（可空白）</label><input inputmode="decimal" value="${esc(f.limit)}" oninput="AF.limit=this.value"></div>` : ''}
+      <div class="two"><div class="fld"><label>信用額度（可空白）</label><input inputmode="decimal" value="${esc(f.limit)}" oninput="AF.limit=this.value"></div>
+      <div class="fld"><label>請款天數（刷卡後幾天入帳）</label><input inputmode="numeric" value="${esc(f.postDays ?? '')}" oninput="AF.postDays=this.value" placeholder="例：2"></div></div>
+      <div class="hint" style="margin:-4px 0 12px">刷卡日＋請款天數 超過結帳日，就自動算下期帳單（跟銀行一樣）。單筆不同時，記帳畫面可填「銀行入帳日」。</div>` : ''}
     <div class="fld"><label>顏色</label><div class="sw">${PALETTE.map(p => `<button style="background:${p}" class="${f.color === p ? 'on' : ''}" onclick="AF.color='${p}';redraw('acf')"></button>`).join('')}</div></div>
     <div class="tog"><span>列入總資產<br><small class="tx2">關閉後不計入淨資產、資產報表，收支照常統計</small></span><input type="checkbox" ${f.inNW !== false ? 'checked' : ''} onchange="AF.inNW=this.checked"></div>
     ${f.id ? `<div class="tog"><span>封存（隱藏但保留紀錄）</span><input type="checkbox" ${f.archived ? 'checked' : ''} onchange="AF.archived=this.checked"></div>` : ''}
@@ -1285,7 +1346,9 @@ function saveAcct(){
   const init = parseFloat(f.initInput) || 0, cr = f.type === 'credit';
   const cd = parseInt(f.closeDay), dd = parseInt(f.dueDay);
   if (cr && (f.closeDay || f.dueDay) && !(cd >= 1 && cd <= 31 && dd >= 1 && dd <= 31)) return toast('結帳日／截止日要是 1–31');
-  const a = {
+  const pdv = parseInt(f.postDays);
+  const a = {...(f.id ? S.data.accounts[f.id] || {} : {}),   // v2.31：保留以帳單為準等其他欄位
+    postDays:cr && pdv >= 0 && pdv <= 15 ? pdv : null,
     id:f.id || 'a_' + uid(), name:f.name.trim(), type:f.type, currency:f.currency,
     init:cr ? -Math.abs(init) : init, initRate:f.currency !== 'TWD' && f.initRate ? parseFloat(f.initRate) : null,
     limit:cr && f.limit ? parseFloat(f.limit) : null, closeDay:cr && cd ? cd : null, dueDay:cr && dd ? dd : null,
@@ -1375,11 +1438,11 @@ function storeSuggest(catId){
 function defaultAcc(){ const l = P.lastAcc; if (l && S.data.accounts[l] && !S.data.accounts[l].archived) return l; return accList()[0]?.id || null; }
 function blankF(){
   const accs = accList(), from = defaultAcc();
-  return {id:null, mode:'txn', type:'expense', catId:suggestCat() || defaultCat('expense'), amtExpr:'', toExpr:'', feeExpr:'', instN:0, instFeeExpr:'', instPerExpr:'', instFirstExpr:'', instAprExpr:'', perAuto:false, fxExpr:'', nextBill:false, repeat:'', until:'', active:'amt',
+  return {id:null, mode:'txn', type:'expense', catId:suggestCat() || defaultCat('expense'), amtExpr:'', toExpr:'', feeExpr:'', instN:0, instFeeExpr:'', instPerExpr:'', instFirstExpr:'', instAprExpr:'', perAuto:false, fxExpr:'', nextBill:false, postDate:'', instPostDay:0, showPer:false, repeat:'', until:'', active:'amt',
     date:S.ui.tab === 'home' ? S.ui.sel : today(), accountId:from, toAccountId:(accs.find(a => a.id !== from) || accs[0]).id, projectId:'', note:'', store:''};
 }
 function fFromObj(o){
-  return {type:o.type, catId:o.catId, amtExpr:exprOf(o.amount), toExpr:exprOf(o.toAmount), feeExpr:exprOf(o.fee), instN:o.inst?.n || 0, instFeeExpr:o.inst?.feeAuto ? '' : exprOf(o.inst?.fee), instPerExpr:exprOf(o.inst?.per), instFirstExpr:exprOf(o.inst?.first), instAprExpr:exprOf(o.inst?.apr), perAuto:false, fxExpr:exprOf(o.fxFee), nextBill:!!o.nextBill,
+  return {type:o.type, catId:o.catId, amtExpr:exprOf(o.amount), toExpr:exprOf(o.toAmount), feeExpr:exprOf(o.fee), instN:o.inst?.n || 0, instFeeExpr:o.inst?.feeAuto ? '' : exprOf(o.inst?.fee), instPerExpr:exprOf(o.inst?.per), instFirstExpr:exprOf(o.inst?.first), instAprExpr:exprOf(o.inst?.apr), perAuto:false, fxExpr:exprOf(o.fxFee), nextBill:!!o.nextBill, postDate:o.postDate || '', instPostDay:o.inst?.postDay || (o.inst?.n > 1 && o.nextBill ? legacyPostDay(S.data.accounts[o.accountId]) : 0), showPer:false,
     accountId:o.accountId, toAccountId:o.toAccountId || (accList().find(a => a.id !== o.accountId) || {}).id, projectId:o.projectId || '', note:o.note || '', store:o.store || ''};
 }
 function openAdd(id, preset){
@@ -1388,6 +1451,7 @@ function openAdd(id, preset){
   if (t) F = {...blankF(), ...fFromObj(t), id:t.id, date:t.date, createdAt:t.createdAt};
   else F = {...blankF(), ...(preset || {})};
   F.active = 'amt'; F.kpHide = !!t;   // v2.30：點開舊紀錄先收起計算機
+  if (t) F._sig = fSig(F);
   openLayer('add', renderAdd, 'full');
 }
 function openRule(rid){
@@ -1431,14 +1495,21 @@ function renderAdd(){
         <select class="ov" onchange="setInst(this.value)"><option value="0">不分期</option>${opts.map(o => `<option value="${o}" ${o === n ? 'selected' : ''}>${o} 期</option>`).join('')}<option value="custom">自訂期數…</option></select></div>
         ${n > 1 && amt > 0 ? instPreview(a, amt, fee, per, first, n) : ''}
         ${n > 1 ? `<div class="frow ${F.active === 'iapr' ? 'on' : ''}" onclick="setAct('iapr')"><span class="lb" style="width:auto">年利率</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instAprExpr ? '' : 'tx2'}">${F.instAprExpr ? esc(F.instAprExpr) + ' %' : '知道年息才填，自動算每期'}</b>${F.instAprExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instAprExpr='';F.perAuto=false;F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>` : ''}
-        ${n > 1 ? `<div class="frow ${F.active === 'iper' ? 'on' : ''}" onclick="setAct('iper')"><span class="lb" style="width:auto">每期金額（照銀行）</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instPerExpr ? '' : 'tx2'}">${F.instPerExpr ? sym + rawFmt(F.instPerExpr) : '沒填就平均拆'}</b>${F.instPerExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instPerExpr='';F.instFirstExpr='';F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>
+        ${n > 1 ? `<div class="frow ${F.active === 'ifee' ? 'on' : ''}" onclick="setAct('ifee')"><span class="lb" style="width:auto">手續費／利息</span><span class="vl" style="justify-content:flex-end"><b class="${F.instFeeExpr ? 'exp' : 'tx2'}">${F.instFeeExpr ? sym + rawFmt(F.instFeeExpr) : auto !== null ? (auto < 0 ? '每期合計比金額少' : `自動算 ${sym}${nf(auto, 2)}`) : '總額，點此輸入'}</b></span></div>` : ''}
+        ${n > 1 && !(F.showPer || F.instPerExpr || F.instFirstExpr || F.instAprExpr || F.instFeeExpr) ? `<button class="sm" style="display:block;margin:-4px 20px 8px auto;color:var(--acc);font-weight:600" onclick="F.showPer=true;redraw('add')">照銀行調整每期金額 ›</button>` : ''}
+        ${n > 1 && (F.showPer || F.instPerExpr || F.instFirstExpr || F.instAprExpr || F.instFeeExpr) ? `<div class="frow ${F.active === 'iper' ? 'on' : ''}" onclick="setAct('iper')"><span class="lb" style="width:auto">每期金額（照銀行）</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instPerExpr ? '' : 'tx2'}">${F.instPerExpr ? sym + rawFmt(F.instPerExpr) : '沒填就平均拆'}</b>${F.instPerExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instPerExpr='';F.instFirstExpr='';F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>` : ''}
         ${F.instPerExpr ? `<div class="frow ${F.active === 'ifirst' ? 'on' : ''}" onclick="setAct('ifirst')"><span class="lb" style="width:auto">首期金額</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.instFirstExpr ? '' : 'tx2'}">${F.instFirstExpr ? sym + rawFmt(F.instFirstExpr) : '跟每期不同才填'}</b>${F.instFirstExpr ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.instFirstExpr='';F.active='amt';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>` : ''}
-        <div class="frow ${F.active === 'ifee' ? 'on' : ''}" onclick="setAct('ifee')"><span class="lb" style="width:auto">手續費／利息</span><span class="vl" style="justify-content:flex-end"><b class="${F.instFeeExpr ? 'exp' : 'tx2'}">${F.instFeeExpr ? sym + rawFmt(F.instFeeExpr) : auto !== null ? (auto < 0 ? '每期合計比金額少' : `自動算 ${sym}${nf(auto, 2)}`) : '總額，點此輸入'}</b></span></div>` : ''}`;
+        `;
       { const amt = evalExpr(F.amtExpr), fx = evalExpr(F.fxExpr);
         fields += `<div class="frow ${F.active === 'fx' ? 'on' : ''}" onclick="setAct('fx')"><span class="lb" style="width:auto">國外手續費</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.fxExpr ? 'exp' : 'tx2'}">${F.fxExpr ? CUR[cur].sym + rawFmt(F.fxExpr) : '沒有就留空'}</b>
           <button class="chipb" style="position:relative;z-index:2;border:1px solid var(--line);border-radius:10px;padding:4px 8px;font-size:12px;background:var(--bg)" onclick="event.stopPropagation();F.fxExpr=${amt > 0 ? `'${Math.round(amt * 0.015)}'` : "''"};F.active='amt';redraw('add')">1.5%</button>${fx ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.fxExpr='';redraw('add')">${ic('x',14)}</button>` : ''}</span></div>`; }
-      if (hasCycle(a)) { const bd = billDate({accountId:a.id, date:F.date, nextBill:F.nextBill});
-        fields += `<div class="frow"><span class="lb" style="width:auto">商店晚請款（算下期）</span><span class="vl" style="justify-content:flex-end"><span class="tx2 sm">入 ${md(bd)} 結帳那期</span></span><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" ${F.nextBill ? 'checked' : ''} onchange="F.nextBill=this.checked;redraw('add')"></div>`; }
+      if (hasCycle(a)) {
+        if (n > 1) { const pd0 = +F.instPostDay || 0, fc = pd0 ? closeOf(a, instPost0(F.date, pd0)) : billDate({accountId:a.id, date:F.date, nextBill:F.nextBill});
+          fields += `<div class="frow"><span class="lb" style="width:auto">每期入帳日</span><span class="vl" style="justify-content:flex-end"><b class="${pd0 ? '' : 'tx2'}">${pd0 ? `每月 ${pd0} 號` : F.nextBill ? '下期開始' : '同刷卡'}</b><span class="tx2 sm">第 1 期入 ${fc.slice(0, 7).replace('-', '/')} 帳單</span></span>${ic('down',16)}
+            <select class="ov" onchange="F.instPostDay=+this.value;F.nextBill=false;redraw('add')"><option value="0" ${!pd0 ? 'selected' : ''}>同刷卡（預設）</option>${Array.from({length:31}, (_, i) => `<option value="${i + 1}" ${pd0 === i + 1 ? 'selected' : ''}>每月 ${i + 1} 號</option>`).join('')}</select></div>`; }
+        else { const pst = F.postDate || addD(F.date, postDaysOf(a)), bd = billDate({accountId:a.id, date:F.date, postDate:F.postDate, nextBill:F.nextBill});
+          fields += `<div class="frow"><span class="lb" style="width:auto">銀行入帳日</span><span class="vl" style="justify-content:flex-end;align-items:center;gap:8px"><b class="${F.postDate ? '' : 'tx2'}">${md(pst)}${F.postDate ? '' : postDaysOf(a) ? `（刷卡＋${postDaysOf(a)} 天）` : ''}</b><span class="tx2 sm">入 ${md(bd)} 結帳那期${F.nextBill && !F.postDate ? '（下期）' : ''}</span>${F.postDate || F.nextBill ? `<button class="tx2" style="position:relative;z-index:2" onclick="event.stopPropagation();F.postDate='';F.nextBill=false;redraw('add')">${ic('x',14)}</button>` : ''}</span><input type="date" class="ov" value="${pst}" onchange="if(this.value){F.postDate=this.value;F.nextBill=false;redraw('add')}"></div>`; }
+      }
       const ot = F.id ? S.data.txns[F.id] : null;
       if (ot && ot.inst && ot.inst.n > 1 && n === ot.inst.n && ot.accountId === F.accountId) { const po = ot.inst.payoff;
         fields += `<button class="frow" style="width:calc(100% - 32px);color:${po ? 'var(--tx)' : 'var(--acc)'};font-weight:600;justify-content:center" onclick="openPayoff('txn','${ot.id}')">${po ? `已提前結清（${md(po.date)}）${poPending(po) ? '・利息待確認' : ''}` : '提前結清…'}</button>`; }
@@ -1512,7 +1583,7 @@ function repeatHint(d, f){ const x = pd(d); return f === 'week' ? '每' + wdName
 /* 新增分期時預覽：加上這筆後，第一期那張帳單的分期合計 */
 function instPreview(a, amt, fee, per, first, n){
   if (!hasCycle(a)) return '';
-  const fc = billDate({accountId:a.id, date:F.date, nextBill:F.nextBill}), p1 = first > 0 ? first : per > 0 ? per : Math.round((amt + fee) / n);
+  const fc = +F.instPostDay ? closeOf(a, instPost0(F.date, +F.instPostDay)) : billDate({accountId:a.id, date:F.date, nextBill:F.nextBill}), p1 = first > 0 ? first : per > 0 ? per : Math.round((amt + fee) / n);
   const ex = cardPieces(a).filter(x => (!x.t || x.t.id !== F.id) && x.p.date === fc).reduce((s, x) => s + x.p.amt + x.p.fee, 0), last = closeAdd(a, fc, n - 1);
   return `<div class="hint" style="margin:-2px 16px 8px">加上這筆後：${fc.slice(0, 7).replace('-', '/')} 帳單分期 ${fmt(ex, a.currency)} → <b>${fmt(ex + p1, a.currency)}</b>，每月多約 ${fmt(per > 0 ? per : (amt + fee) / n, a.currency)}，到 ${last.slice(0, 7).replace('-', '/')}</div>`;
 }
@@ -1591,7 +1662,7 @@ function saveTxn(){
     const old = F.ruleId ? S.data.recurring[F.ruleId] : null;
     const r = {...(old || {}), ...o, id:F.ruleId || 'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:F.ruleActive !== false,
       base:old && old.start === F.date && old.freq === F.repeat ? old.base : addD(F.date, -1), handled:old && old.start === F.date && old.freq === F.repeat ? (old.handled || []) : []};
-    put('recurring', r, true); closeLayer('add'); render(); redraw('rules'); toast('已儲存固定收支'); return;
+    put('recurring', r, true); F.ruleId = r.id; F.kpHide = true; F.active = 'amt'; render(); redraw('rules'); redraw('add'); toast('已儲存固定收支'); return;
   }
   const old = F.id ? S.data.txns[F.id] : null;
   const t = {...(old || {}), ...o, id:F.id || 't_' + uid(), date:F.date, createdAt:F.createdAt || Date.now()};
@@ -1599,7 +1670,11 @@ function saveTxn(){
   delete t.inst; delete t.nextBill; delete t.fxFee; if (!o.store) delete t.store;
   if (t.type === 'expense' && S.data.accounts[t.accountId]?.type === 'credit' && evalExpr(F.fxExpr) > 0) t.fxFee = evalExpr(F.fxExpr);
   if (t.type !== 'transfer') { delete t.toAccountId; delete t.toAmount; delete t.fee; }
-  if (t.type === 'expense' && F.nextBill && hasCycle(S.data.accounts[t.accountId])) t.nextBill = true;
+  delete t.postDate;
+  if (t.type === 'expense' && hasCycle(S.data.accounts[t.accountId])) {
+    if (F.instN > 1 ? (F.nextBill && !+F.instPostDay) : (F.nextBill && !F.postDate)) t.nextBill = true;
+    if (F.instN <= 1 && F.postDate) t.postDate = F.postDate;
+  }
   if (old && old.rate && (S.data.accounts[old.accountId]?.currency !== S.data.accounts[t.accountId]?.currency || old.amount !== t.amount)) delete t.rate;
   let autoFee = 0;
   if (t.type === 'expense' && F.instN > 1 && S.data.accounts[t.accountId]?.type === 'credit') {
@@ -1608,14 +1683,21 @@ function saveTxn(){
     if (per > 0) { const r = instCalc(t.amount, n, per, first, feeIn); if (r.err) { F.active = 'iper'; F.kpHide = false; redraw('add'); return toast(r.err); }
       Object.assign(t.inst, {per, fee:r.fee}, first > 0 ? {first} : {}, r.auto ? {feeAuto:true} : {}); if (r.auto) autoFee = r.fee; }
     if (evalExpr(F.instAprExpr) > 0) t.inst.apr = evalExpr(F.instAprExpr);
+    if (+F.instPostDay > 0 && hasCycle(S.data.accounts[t.accountId])) t.inst.postDay = +F.instPostDay;
+  }
+  if (t.type === 'transfer' && S.data.accounts[t.toAccountId]?.type === 'credit') {   // v2.31：繳卡費重複提醒
+    const amt = t.toAmount || t.amount, dup = compute().list.find(x => x.id !== t.id && x.type === 'transfer' && x.toAccountId === t.toAccountId && Math.abs((x.toAmount || x.amount) - amt) < 0.5 && Math.abs(diffD(x.date, t.date)) <= 7);
+    if (dup && !confirm(`${dup.date.replace(/-/g, '/')} 已經有一筆相同金額 ${fmt(amt, S.data.accounts[t.toAccountId].currency)} 繳進這張卡，可能重複。\n仍要儲存？`)) return;
   }
   if (t.type !== 'transfer') P.lastCat[t.type] = t.catId;
   P.lastAcc = F.accountId; savePrefs();
   put('txns', t, true);
   if (F.due) markHandled(F.due.rid, F.due.date);
   if (!F.id && F.repeat) put('recurring', {...o, id:'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:true, base:F.date, handled:[]}, true);
-  S.ui.sel = t.date; closeLayer('add'); render(); redraw('due');
-  toast((F.id ? '已更新' : F.repeat ? '已記錄，並設為固定收支' : '已記錄') + (autoFee ? `，利息 ${nf(autoFee, 2)} 算進手續費` : '') + budgetWarn(t));
+  const wasId = F.id, rep0 = F.repeat;
+  S.ui.sel = t.date; F.id = t.id; F.createdAt = t.createdAt; F.due = null; F.repeat = ''; F.kpHide = true; F.active = 'amt'; F.perAuto = false; F._sig = fSig(F);   // v2.31：存檔後留在本頁
+  render(); redraw('due'); redraw('add');
+  toast((wasId ? '已儲存' : rep0 ? '已記錄，並設為固定收支' : '已儲存') + (autoFee ? `，利息 ${nf(autoFee, 2)} 算進手續費` : '') + budgetWarn(t));
 }
 function delTxn(){ if (!confirm('刪除這筆紀錄？')) return; const id = F.id; closeLayer('add'); del('txns', id); toast('已刪除'); }
 function copyTxn(){ F = {...F, id:null, createdAt:null, date:today(), repeat:'', until:'', due:null}; redraw('add'); toast('已複製，可修改後按 OK'); }
@@ -1980,7 +2062,7 @@ function renderInstLog(){
 function openInstOne(i){
   const x = instLogItems(IL.aid)[i]; if (!x) return; const f = v => fmt(v, x.a.currency), ci = x.ci, prev = ci ? closeAdd(x.a, ci.close, -1) : null;
   const ps = x.ps.map(p => { const billed = p.date <= x.cut, cur = ci && p.date > prev && p.date <= ci.close && ci.remain > 0;
-    return `<div class="row" style="padding:8px 14px"><span class="mid"><b style="font-weight:500">${ym7(p.date)}${p.payoff ? ' 提前結清' : ` 第 ${p.k + 1}/${x.n} 期`}</b><small>${p.fee ? (p.payoff ? '含利息／違約金 ' : '含手續費 ') + f(p.fee) : '無手續費'}</small></span>
+    return `<div class="row" style="padding:8px 14px"><span class="mid"><b style="font-weight:500">${ym7(p.date)}${p.payoff ? ' 提前結清' : ` 第 ${p.k + 1}/${x.n} 期`}</b><small>本金 ${f(p.amt)}・${p.payoff ? '利息／違約金' : '利息'} ${f(p.fee)}${p.post ? '・入帳 ' + md(p.post) : ''}</small></span>
       <span class="amt">${f(p.amt + p.fee)}<small class="${cur ? 'exp' : billed ? 'tx2' : ''}" style="${!billed ? 'color:var(--pri)' : ''}">${cur ? '本期未繳' : billed ? '已入帳' : '未到期'}</small></span></div>`; }).join('');
   const info = [['卡片', esc(x.a.name)], [x.kind === 'txn' ? '刷卡日' : '開始', x.kind === 'txn' ? x.date.replace(/-/g, '/') : ym7(x.ps[0] ? x.ps[0].date : x.date)], ['本金', f(x.principal)], ['利息＋手續費', f(x.cost)], ['合計', f(x.tot)], ['期數', x.n + ' 期']];
   if (x.apr) info.push(['年利率', x.apr + ' %']);
@@ -2420,22 +2502,23 @@ async function doImport(){
 const CSV_HEAD = ['日期','類型','主分類','子分類','帳戶','幣別','金額','轉入帳戶','轉入幣別','轉入金額','手續費','台幣金額','專案','備註','發票號碼','分期期數','分期手續費','商家','ID'];
 const csvCell = v => { v = v === null || v === undefined ? '' : String(v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 function catNames(id){ const c = S.data.categories[id]; if (!c) return ['', '']; const m = c.parent ? S.data.categories[c.parent] : null; return m ? [m.name, c.name] : [c.name, '']; }
-function exportCSV(from, to){
+function exportCSV(from, to, aid){
   const c = compute(), A = S.data.accounts, P2 = S.data.projects, lines = [CSV_HEAD.join(',')];
   const rnd = n => Math.round(n * 100) / 100;
   for (const t of c.list) {
     if ((from && t.date < from) || (to && t.date > to)) continue;
+    if (aid && t.accountId !== aid && t.toAccountId !== aid) continue;
     const a = A[t.accountId], b = A[t.toAccountId], tr = t.type === 'transfer', [m, sb] = tr ? ['', ''] : catNames(t.catId);
     lines.push([t.date, {expense:'支出', income:'收入', transfer:'轉帳'}[t.type], m, sb, a ? a.name : '', a ? a.currency : '', t.amount,
       tr && b ? b.name : '', tr && b ? b.currency : '', tr ? (t.toAmount || t.amount) : '', tr ? (t.fee || 0) : (t.fxFee || ''), rnd(c.tw[t.id]?.amt || 0),
       P2[t.projectId] && !P2[t.projectId].hidden ? P2[t.projectId].name : '', t.note || '', t.invoice || '', t.inst?.n > 1 ? t.inst.n : '', t.inst?.n > 1 ? (t.inst.fee || 0) : '', t.store || '', t.id].map(csvCell).join(','));
   }
   for (const f of c.flows) {
-    if (!f.t.plan || (from && f.date < from) || (to && f.date > to)) continue;
+    if (!f.t.plan || (from && f.date < from) || (to && f.date > to) || (aid && f.t.accountId !== aid)) continue;
     const pl = S.data.plans[f.t.plan], a = A[f.t.accountId], [m, sb] = catNames(FEE_CAT);
     lines.push([f.date, '支出', m, sb, a ? a.name : '', a ? a.currency : '', rnd(f.o), '', '', '', '', rnd(f.amt), '', f.t.note + '（App 自動計算）', '', '', '', '', `plan_${f.t.plan}`].map(csvCell).join(','));
   }
-  saveFile(`Money_${from || '全部'}${to ? '_' + to : ''}.csv`, '﻿' + lines.join('\r\n'), 'text/csv', lines.length - 1);
+  saveFile(`Money_${aid && A[aid] ? A[aid].name + '_' : ''}${from || '全部'}${to ? '_' + to : ''}.csv`, '﻿' + lines.join('\r\n'), 'text/csv', lines.length - 1);
 }
 function exportJSON(){
   const j = {app:'Money', version:VERSION, exportedAt:new Date().toISOString(), data:S.data, settings:S.settings};
@@ -2454,17 +2537,18 @@ async function saveFile(name, text, type, n){
   setTimeout(() => URL.revokeObjectURL(u), 4000); toast(`已匯出 ${n} 筆`);
 }
 let EX = {from:'', to:''};
-function openExport(){ EX = {from:'', to:''}; openLayer('exp', renderExport, 'btm'); }
+function openExport(){ EX = {from:'', to:'', aid:''}; openLayer('exp', renderExport, 'btm'); }
 function renderExport(){
   const y = new Date().getFullYear(), set = (f, t) => `EX.from='${f}';EX.to='${t}';redraw('exp')`;
-  const n = Object.values(S.data.txns).filter(t => (!EX.from || t.date >= EX.from) && (!EX.to || t.date <= EX.to)).length;
+  const n = Object.values(S.data.txns).filter(t => (!EX.from || t.date >= EX.from) && (!EX.to || t.date <= EX.to) && (!EX.aid || t.accountId === EX.aid || t.toAccountId === EX.aid)).length;
   const body = `<div class="fld"><label>CSV 期間</label><div class="sw" style="gap:6px;margin-bottom:8px">
       <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set('', '')}">全部</button>
       <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set(y + '-01-01', y + '-12-31')}">今年</button>
       <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set((y - 1) + '-01-01', (y - 1) + '-12-31')}">去年</button>
       <button class="btn sec2" style="width:auto;padding:7px 12px" onclick="${set(today().slice(0, 8) + '01', today())}">本月</button></div>
       <div class="two"><input type="date" value="${EX.from}" onchange="EX.from=this.value;redraw('exp')"><input type="date" value="${EX.to}" onchange="EX.to=this.value;redraw('exp')"></div></div>
-    <button class="btn" onclick="exportCSV(EX.from,EX.to)">匯出 CSV（${n} 筆）</button>
+    <div class="fld"><label>帳戶</label><select onchange="EX.aid=this.value;redraw('exp')"><option value="">全部帳戶</option>${accList(true).map(a => `<option value="${a.id}" ${EX.aid === a.id ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
+    <button class="btn" onclick="exportCSV(EX.from,EX.to,EX.aid)">匯出 CSV（${n} 筆${EX.aid ? '，含轉入這個帳戶的轉帳／繳卡費' : ''}）</button>
     <div class="hint" style="margin:8px 0 16px">Excel、Google 試算表、Numbers 都能開。這個檔也能匯回 Money。</div>
     <button class="btn sec2" onclick="exportJSON()">完整備份（含帳戶、分類、專案、設定）</button>
     <div class="hint" style="margin:8px 0 0">換手機或出問題時，用「匯入」選這個檔就能還原。</div>`;
@@ -2771,6 +2855,7 @@ function viewSettings(){
     <div class="list set">
       <button class="row" onclick="S.ui.rp.seg='budget';go('reports')"><span class="mid"><b>預算</b><small>${hasBudget() ? '已設定' : '未設定'}</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openFixed()"><span class="mid"><b>固定支出分類</b><small>${(S.settings.fixed || []).length ? (S.settings.fixed || []).map(id => S.data.categories[id]?.name).filter(Boolean).join('、') : '未設定 · 報表「可省支出」會用到'}</small></span>${ic('right',18)}</button>
+      <div class="row"><span class="mid"><b>分期利息按月認列</b><small>報表的「手續費」照每期帳單月份算（跟銀行一樣）；關掉＝整筆算在刷卡日</small></span><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" ${S.settings.feeByPeriod !== false ? 'checked' : ''} onchange="putSettings({feeByPeriod:this.checked})"></div>
       <button class="row" onclick="openRules()"><span class="mid"><b>固定收支</b><small>${Object.values(S.data.recurring || {}).filter(r => r.active !== false).length} 個進行中</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openTplMgr()"><span class="mid"><b>常用範本</b><small>${tplList().length} 個</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openCatMgr()"><span class="mid"><b>分類管理</b><small>新增、改名、刪除</small></span>${ic('right',18)}</button>
@@ -3048,7 +3133,8 @@ addEventListener('popstate', () => {
 /* 離開 App 再回來：回到首頁＋今天（停靠點）。正在記帳且已輸入內容時保留，避免資料遺失 */
 let awayAt = 0, BUSY_UNTIL = 0;
 const LAUNCH_CARRIER = location.hash === '#carrier' && FEAT.carrier;
-function hasDraft(){ return LAYERS.some(l => l.key === 'add') && F && (F.amtExpr || F.note.trim()); }
+const fSig = f => JSON.stringify({...f, active:0, kpHide:0, showPer:0, perAuto:0, _sig:0});
+function hasDraft(){ return LAYERS.some(l => l.key === 'add') && F && (F.amtExpr || F.note.trim()) && !(F._sig && F._sig === fSig(F)); }
 function backToDock(){
   if (!S.ready || Date.now() < BUSY_UNTIL) return;
   const keepAdd = hasDraft();
