@@ -292,7 +292,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.31';
+const VERSION = 'v2.32';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -509,8 +509,17 @@ function applyPayoff(ps, po, a){
 let IP = {ver:-1, m:new Map()};
 const rd2 = v => Math.round(v * 100) / 100;
 /* v2.31：有年利率時，每期利息照本息平均攤還分（前面多、後面少，跟銀行一樣）；合計不變 */
+function impliedApr(P, pays){   // 每期金額的現值＝本金，二分法求月利率
+  const tot = pays.reduce((x, y) => x + y, 0); if (!(P > 0) || tot - P < 0.5) return 0;
+  const pv = r => pays.reduce((x, p, k) => x + p / Math.pow(1 + r, k + 1), 0);
+  let lo = 0, hi = 0.1; if (pv(hi) > P) return 0;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (pv(m) > P) lo = m; else hi = m; }
+  return (lo + hi) / 2 * 1200;
+}
 function aprFees(P, n, apr, pays){
-  if (!(apr > 0) || !pays || pays.length !== n) return null;
+  if (!pays || pays.length !== n) return null;
+  if (!(apr > 0)) apr = impliedApr(P, pays);
+  if (!(apr > 0)) return null;
   const r = apr / 1200, fs = []; let bal = P;
   for (let k = 0; k < n; k++) { const i = k === n - 1 ? rd2(pays[k] - bal) : Math.round(bal * r); if (i < 0 || i > pays[k]) return null; fs.push(i); bal = rd2(bal - (pays[k] - i)); }
   return fs;
@@ -1552,7 +1561,7 @@ function renderAdd(){
       ${notes.length ? `<div class="chips">${notes.map(n => `<button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();this.closest('.layer').classList.remove('typing');F.note=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}
     </div>
     <div class="kpw"><button class="kpdn" onclick="kpSet(true)" title="收起計算機（不存檔）">▼</button><div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','00','0','.','+'].map(k => `<button class="${OPS.test(k) || k === '%' ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div></div>
-    <div class="kpsave"><button onclick="saveTxn()">儲存</button></div>
+    <div class="kpsave"><button onclick="saveTxn(true)">儲存</button></div>
     <div class="kbok"><button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();saveTxn()">OK 存檔</button></div></div>`;
 }
 /* v2.21：電腦（滑鼠＋實體鍵盤）打字時不藏計算機；手機打字時藏計算機，鍵盤上方留「OK 存檔」條 */
@@ -1655,14 +1664,16 @@ function formBody(){
   }
   return o;
 }
-function saveTxn(){
+function saveTxn(close){
   const o = formBody(); if (!o) return;
   if (F.mode === 'rule') {
     if (!F.repeat) return toast('請選擇重複頻率');
     const old = F.ruleId ? S.data.recurring[F.ruleId] : null;
     const r = {...(old || {}), ...o, id:F.ruleId || 'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:F.ruleActive !== false,
       base:old && old.start === F.date && old.freq === F.repeat ? old.base : addD(F.date, -1), handled:old && old.start === F.date && old.freq === F.repeat ? (old.handled || []) : []};
-    put('recurring', r, true); F.ruleId = r.id; F.kpHide = true; F.active = 'amt'; render(); redraw('rules'); redraw('add'); toast('已儲存固定收支'); return;
+    put('recurring', r, true);
+    if (close) { closeLayer('add'); render(); redraw('rules'); toast('已儲存固定收支'); return; }
+    F.ruleId = r.id; F.kpHide = true; F.active = 'amt'; render(); redraw('rules'); redraw('add'); toast('已儲存固定收支'); return;
   }
   const old = F.id ? S.data.txns[F.id] : null;
   const t = {...(old || {}), ...o, id:F.id || 't_' + uid(), date:F.date, createdAt:F.createdAt || Date.now()};
@@ -1696,7 +1707,8 @@ function saveTxn(){
   if (!F.id && F.repeat) put('recurring', {...o, id:'r_' + uid(), freq:F.repeat, start:F.date, until:F.until || null, active:true, base:F.date, handled:[]}, true);
   const wasId = F.id, rep0 = F.repeat;
   S.ui.sel = t.date; F.id = t.id; F.createdAt = t.createdAt; F.due = null; F.repeat = ''; F.kpHide = true; F.active = 'amt'; F.perAuto = false; F._sig = fSig(F);   // v2.31：存檔後留在本頁
-  render(); redraw('due'); redraw('add');
+  if (close) closeLayer('add');   // v2.32：底部「儲存」存完回上一頁；OK 留在本頁
+  render(); redraw('due'); if (!close) redraw('add');
   toast((wasId ? '已儲存' : rep0 ? '已記錄，並設為固定收支' : '已儲存') + (autoFee ? `，利息 ${nf(autoFee, 2)} 算進手續費` : '') + budgetWarn(t));
 }
 function delTxn(){ if (!confirm('刪除這筆紀錄？')) return; const id = F.id; closeLayer('add'); del('txns', id); toast('已刪除'); }
