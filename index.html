@@ -332,7 +332,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.35';
+const VERSION = 'v2.36';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -976,7 +976,7 @@ function viewHome(){
       <div class="tap" onclick="goRp('trend','month',${y},${m})"><small>本月結餘 ›</small><b class="${ms.inc - ms.exp < 0 ? 'exp' : ''}">${twd(ms.inc - ms.exp)}</b></div></div>
       ${(() => { const v = availNow(), np = nextPayday(), dl = np ? Math.max(1, diffD(np, td)) : 0;
         return `<div class="avl tap" onclick="go('accounts')"><div class="l1"><span class="tx2">手上可動用 ›</span><b class="${v.avail < 0 ? 'exp' : ''}">${twd(v.avail)}</b></div>
-          <div class="sm tx2">${v.card >= 1 ? `已扣卡費 ${twd(v.card)}` : '卡費都繳清了'}${np ? `・<span style="text-decoration:underline dotted" onclick="event.stopPropagation();setPayOv()">到 ${md(np)}</span> 每天可花 <b style="color:var(--tx)">${twd(Math.max(0, v.avail) / dl)}</b>` : ''}</div></div>`; })()}
+          ${np ? `<div class="sm tx2"><span style="text-decoration:underline dotted" onclick="event.stopPropagation();setPayOv()">到 ${md(np)}</span> 每天可花 <b style="color:var(--tx)">${twd(Math.max(0, v.avail) / dl)}</b></div>` : ''}</div>`; })()}
       ${bud && bud.total ? (() => { const T = bud.total;
         return `<div class="bref tap" onclick="goRp('budget','month',${y},${m})">預算參考：${T.remain >= 0 ? `還剩 ${twd(T.remain)}` : `超出 ${twd(-T.remain)}`}（已用 ${Math.round(T.pct * 100)}%）›</div>`; })() : ''}</div>
     ${goalHome()}<div class="per">${perCell('本週', wsum, `openRange('${ws}','${addD(ws, 6)}')`, wPrev.exp && wNow.exp ? cmpTxt(pct(wNow.exp, wPrev.exp), '比上週') : '')}${perCell(`${m+1}月`, ms, `goRp('trend','month',${y},${m})`, mPrev.exp && mNow.exp ? cmpTxt(pct(mNow.exp, mPrev.exp), '比上月') : '')}${perCell(`${y}年`, ysum, `goRp('trend','year',${y},${m})`)}</div>
@@ -2068,15 +2068,12 @@ function openOvRange(){
     <div class="two"><div class="fld"><label>從（月份）</label><input type="month" value="${S.ui.rp.cf}" onchange="S.ui.rp.cf=this.value"></div><div class="fld"><label>到（月份）</label><input type="month" value="${S.ui.rp.ct}" onchange="S.ui.rp.ct=this.value"></div></div>
     <button class="btn" onclick="S.ui.rp.ov='c';UX.ovSel=null;closeLayer('ovr');render()">套用</button>`), 'btm');
 }
-/* ===== v2.35 手上可動用：勾「列入可動用」的帳戶餘額 −（列入資產的信用卡 本期未繳＋下期待繳） ===== */
+/* ===== 手上可動用：勾「列入可動用」的帳戶餘額合計（v2.36 起不扣信用卡；卡費繳款記轉帳後餘額自然減少） ===== */
 const spendable = a => a.type !== 'credit' && !a.archived && (a.spend !== undefined ? a.spend !== false : ['cash', 'bank', 'epay'].includes(a.type));
 function availNow(){
-  const c = compute(); let have = 0, card = 0;
-  for (const a of Object.values(S.data.accounts)) {
-    if (spendable(a)) have += (c.bal[a.id] || 0) * rate(a.currency);
-    else if (a.type === 'credit' && !a.archived && a.inNW !== false) { const ci = cardInfo(a); card += (ci ? ci.remain + ci.post : Math.max(0, -(c.bal[a.id] || 0))) * rate(a.currency); }
-  }
-  return {have, card, avail:have - card};
+  const c = compute(); let have = 0;
+  for (const a of Object.values(S.data.accounts)) if (spendable(a)) have += (c.bal[a.id] || 0) * rate(a.currency);
+  return {have, avail:have};
 }
 /* 發薪日（可多個）：遇週末自動提前到週五；國定假日不抓資料，由使用者在首頁改當月實際發薪日（S.settings.payOv） */
 function isOffDay(d){ const w = pd(d).getDay(); return w === 0 || w === 6; }
