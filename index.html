@@ -292,7 +292,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.32';
+const VERSION = 'v2.33';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -1990,14 +1990,17 @@ function sparkline(v){ const W = 100, H = 30, mx = Math.max(1, ...v), g = W / Ma
 /* ===== 分期壓力（未來 12 個月每月要還）===== */
 function pressureData(aid){
   const now = new Date(), k0 = now.getFullYear() * 12 + now.getMonth(), ms = [...Array(12)].map((_, i) => { const d = new Date(now.getFullYear(), now.getMonth() + i, 1); return [d.getFullYear(), d.getMonth()]; }), sum = ms.map(() => 0), items = ms.map(() => []);
-  let curA = null; const addP = (p, x) => { const d = pd(p.date), i = d.getFullYear() * 12 + d.getMonth() - k0; if (i >= 0 && i < 12) { sum[i] += p.amt + p.fee; if (x) items[i].push({a:curA, x}); } };
+  let curA = null; const addP = (p, x, net, cut) => { const d = pd(p.date), i = d.getFullYear() * 12 + d.getMonth() - k0; if (i >= 0 && i < 12) { sum[i] += net; if (x) items[i].push({a:curA, x, net, cut}); } };
   /* v2.26：跟信用卡待繳一致——只算還沒入帳的期數（本期結帳日之後）；提前結清的結清款不算；待繳總額 0 的卡不算 */
   for (const a of Object.values(S.data.accounts)) {
     if (a.type !== 'credit' || a.archived || a.inNW === false || (aid && a.id !== aid)) continue;
     const ci = cardInfo(a), bal = compute().bal[a.id] || 0;
     if (ci ? ci.debt < 1 : bal > -1) continue;
     const after = ci ? ci.close : today();
-    curA = a; cardPieces(a).forEach(x => { if (!x.p.payoff && x.p.date > after) addP(x.p, x); });
+    /* v2.33：卡上的預繳／溢繳先依月份抵掉各期，只算實際要繳的 */
+    let credit = ci ? Math.max(0, (ci.off.u || 0) + Math.max(0, (ci.off.p || 0) - Math.max(0, ci.newPost || 0))) : 0;
+    curA = a; cardPieces(a).filter(x => !x.p.payoff && x.p.date > after).sort((x, y) => x.p.date < y.p.date ? -1 : x.p.date > y.p.date ? 1 : 0)
+      .forEach(x => { const v = x.p.amt + x.p.fee, use = Math.min(credit, v); credit -= use; addP(x.p, x, v - use, use); });
   }
   return {ms, sum, items};
 }
@@ -2009,7 +2012,7 @@ function pressureCard(fixedAid){
   let drop = null; for (let i = 1; i < 12; i++) { const d = sum[i - 1] - sum[i]; if (d >= 300 && (!drop || d > drop.v)) drop = {i, v:d}; }
   const lastI = sum.reduce((l, v, i) => v > 0 ? i : l, -1);
   const chips = !fixedAid && cards.length > 1 ? `<div class="fxc" style="margin:0 0 6px"><button class="${!aid ? 'on' : ''}" onclick="UX.pcard='';render()">全部</button>${cards.map(a => `<button class="${aid === a.id ? 'on' : ''}" onclick="UX.pcard='${a.id}';render()">${esc(a.name)}</button>`).join('')}</div>` : '';
-  return `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>分期壓力（每月要還）</h3><span class="sm tx2">未來 12 個月</span></div>${chips}${multiLine(ms.map(([, m]) => (m + 1) + '月'), [{k:'p', vals:sum, color:'var(--exp)'}], null, 'pressPick')}
+  return `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>分期壓力（每月要還）</h3><span class="sm tx2">未來 12 個月・已扣預繳</span></div>${chips}${multiLine(ms.map(([, m]) => (m + 1) + '月'), [{k:'p', vals:sum, color:'var(--exp)'}], null, 'pressPick')}
     <div class="sm" style="margin-top:4px">${(() => { const f = sum.findIndex(v => v > 0); return `<span style="cursor:pointer;text-decoration:underline dotted" onclick="pressPick(${f})">最近一期（${ms[f][1] + 1} 月）<b class="exp">${twd(sum[f])}</b></span>`; })()}${drop ? `・<span style="color:var(--acc);font-weight:600">${ms[drop.i][1] + 1} 月起每月少 ${twd(drop.v)}</span>` : ''}${lastI >= 0 && lastI < 11 ? `<span class="tx2">・最後一期 ${ms[lastI][0]}/${ms[lastI][1] + 1}</span>` : lastI === 11 ? '<span class="tx2">・超過 12 個月</span>' : ''}</div></div>`;
 }
 /* v2.27：點分期壓力某個月 → 那個月的分期明細（依卡分組），點卡名開那期帳單 */
@@ -2018,10 +2021,10 @@ function pressPick(i){
   const {ms, sum, items} = pressureData(PRESS_AID), [y, m] = ms[i], L = items[i];
   const name = x => x.pl ? (x.pl.name || '帳單分期') : (x.t.store ? x.t.store + '・' : '') + (catOf(x.t.catId)?.name || '分期');
   const by = new Map(); L.forEach(r => { if (!by.has(r.a.id)) by.set(r.a.id, {a:r.a, l:[]}); by.get(r.a.id).l.push(r); });
-  const body = L.length ? [...by.values()].map(g => { const a = g.a, tot = g.l.reduce((s2, r) => s2 + r.x.p.amt + r.x.p.fee, 0), close = g.l[0].x.p.date;
+  const body = L.length ? [...by.values()].map(g => { const a = g.a, tot = g.l.reduce((s2, r) => s2 + r.net, 0), cut = g.l.reduce((s2, r) => s2 + (r.cut || 0), 0), close = g.l[0].x.p.date;
     const go2 = hasCycle(a) ? `closeLayer('pmon');openStmt('${a.id}','${hasCycle(a) ? closeOf(a, close) : close}')` : `closeLayer('pmon');openFuture('${a.id}')`;
-    return `<div class="list" style="margin:0 0 10px;box-shadow:none;background:var(--bg)"><button class="row" onclick="${go2}"><span class="mid"><b>${esc(a.name)}</b><small>${hasCycle(a) ? md(closeOf(a, close)) + ' 結帳那期・點看帳單明細' : '點看分期預估'}</small></span><span class="amt exp">${twd(tot)}</span>${ic('right',16)}</button>
-      ${g.l.map(r => `<div class="row" style="padding:8px 14px"><span class="mid"><b style="font-weight:500">${esc(name(r.x))}</b><small>第 ${r.x.p.k + 1}/${r.x.n} 期${r.x.p.fee ? '・含手續費 ' + twd(r.x.p.fee) : ''}</small></span><span class="amt">${twd(r.x.p.amt + r.x.p.fee)}</span></div>`).join('')}</div>`; }).join('')
+    return `<div class="list" style="margin:0 0 10px;box-shadow:none;background:var(--bg)"><button class="row" onclick="${go2}"><span class="mid"><b>${esc(a.name)}</b><small>${hasCycle(a) ? md(closeOf(a, close)) + ' 結帳那期・點看帳單明細' : '點看分期預估'}${cut >= 1 ? `・預繳抵扣 ${twd(cut)}` : ''}</small></span><span class="amt exp">${twd(tot)}</span>${ic('right',16)}</button>
+      ${g.l.map(r => `<div class="row" style="padding:8px 14px"><span class="mid"><b style="font-weight:500">${esc(name(r.x))}</b><small>第 ${r.x.p.k + 1}/${r.x.n} 期${r.x.p.fee ? '・含手續費 ' + twd(r.x.p.fee) : ''}${r.cut >= 1 ? `・帳單 ${twd(r.x.p.amt + r.x.p.fee)}，預繳抵扣 ${twd(r.cut)}` : ''}</small></span><span class="amt">${twd(r.net)}</span></div>`).join('')}</div>`; }).join('')
     : '<div class="empty">這個月沒有分期</div>';
   openLayer('pmon', () => sheet('pmon', `${y}/${m + 1} 分期 <span class="exp">${twd(sum[i])}</span>`, body), 'btm');
 }
