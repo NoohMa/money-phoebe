@@ -248,8 +248,12 @@ body{zoom:var(--z)}
 .sum3>div,.ovk>div,.kv>div{min-width:0}
 .cmpt td,.cmpt th{white-space:nowrap}
 .cbar{height:6px;border-radius:3px;margin-top:3px}
+.avl{margin-top:12px;padding:10px 2px 2px;border-top:1px solid var(--line)}
+.avl .l1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.avl .l1 b{font-size:22px;font-weight:800;white-space:nowrap}
+.bref{margin-top:6px;font-size:12px;color:var(--tx2);padding:2px}
 .top h1{white-space:nowrap}
-.tog{flex-wrap:wrap;gap:8px}.tog>span:first-child{white-space:nowrap}.tog .seg button{padding:7px 11px;white-space:nowrap}
+.tog{flex-wrap:wrap;gap:8px}.tog>span:first-child:not(:has(br)){white-space:nowrap}.tog .seg button{padding:7px 11px;white-space:nowrap}
 .ovk>div>span:not(.cmp){display:block}
 @media (max-width:399px){.top h1{font-size:20px}}
 @media (min-width:700px){
@@ -328,7 +332,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.34';
+const VERSION = 'v2.35';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -931,7 +935,7 @@ function alerts(){
   const out = [], dl = dueList();
   if (dl.length) out.push(`<button class="alert" style="width:calc(100% - 32px);text-align:left" onclick="openDue()">${ic('repeat',18)}<span style="flex:1">固定收支 <b>${dl.length} 筆</b>待確認</span>${ic('right',16)}</button>`);
   const n = new Date(), b = budgetOf(n.getFullYear(), n.getMonth());
-  if (b) {
+  if (b && false) {   // v2.35：首頁不再顯示預算超支提醒（預算只當參考，預算頁照常顯示）
     const over = Object.entries(b.cats).filter(([, v]) => v.pct >= 1).map(([id]) => S.data.categories[id]?.name).filter(Boolean);
     if (b.total && b.total.pct >= 1) out.push(`<button class="alert warn" style="width:calc(100% - 32px);text-align:left" onclick="S.ui.rp.seg='budget';go('reports')">${ic('target',18)}<span>本月總預算已超支 ${twd(-b.total.remain)}</span></button>`);
     else if (b.total && b.total.pct >= .85) out.push(`<button class="alert" style="width:calc(100% - 32px);text-align:left" onclick="S.ui.rp.seg='budget';go('reports')">${ic('target',18)}<span>本月預算已用 ${Math.round(b.total.pct * 100)}%，剩 ${twd(b.total.remain)}</span></button>`);
@@ -970,10 +974,11 @@ function viewHome(){
       <div class="tap" onclick="goRp('cat','month',${y},${m},'income')"><small>本月收入 ›</small><b class="inc">${twd(ms.inc)}</b></div>
       <div class="tap" onclick="goRp('cat','month',${y},${m},'expense')"><small>本月支出 ›</small><b class="exp">${twd(ms.exp)}</b></div>
       <div class="tap" onclick="goRp('trend','month',${y},${m})"><small>本月結餘 ›</small><b class="${ms.inc - ms.exp < 0 ? 'exp' : ''}">${twd(ms.inc - ms.exp)}</b></div></div>
-      ${bud && bud.total ? (() => { const T = bud.total, now = new Date(), cur = y === now.getFullYear() && m === now.getMonth(), left = dim(y, m) - now.getDate() + 1;
-        return `<div class="tap" style="margin-top:12px;padding:8px 2px 2px;border-top:1px solid var(--line)" onclick="goRp('budget','month',${y},${m})">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px"><span><span class="tx2">本月可用 ›</span> <b style="font-size:16px" class="${T.remain < 0 ? 'exp' : ''}">${twd(T.remain)}</b></span>
-          <span class="tx2">${cur && T.remain > 0 ? `每天可花 ${twd(T.remain / left)}` : `預算 ${twd(T.avail)}`}</span></div>${bbar(T.pct)}</div>`; })() : ''}</div>
+      ${(() => { const v = availNow(), np = nextPayday(), dl = np ? Math.max(1, diffD(np, td)) : 0;
+        return `<div class="avl tap" onclick="go('accounts')"><div class="l1"><span class="tx2">手上可動用 ›</span><b class="${v.avail < 0 ? 'exp' : ''}">${twd(v.avail)}</b></div>
+          <div class="sm tx2">${v.card >= 1 ? `已扣卡費 ${twd(v.card)}` : '卡費都繳清了'}${np ? `・<span style="text-decoration:underline dotted" onclick="event.stopPropagation();setPayOv()">到 ${md(np)}</span> 每天可花 <b style="color:var(--tx)">${twd(Math.max(0, v.avail) / dl)}</b>` : ''}</div></div>`; })()}
+      ${bud && bud.total ? (() => { const T = bud.total;
+        return `<div class="bref tap" onclick="goRp('budget','month',${y},${m})">預算參考：${T.remain >= 0 ? `還剩 ${twd(T.remain)}` : `超出 ${twd(-T.remain)}`}（已用 ${Math.round(T.pct * 100)}%）›</div>`; })() : ''}</div>
     ${goalHome()}<div class="per">${perCell('本週', wsum, `openRange('${ws}','${addD(ws, 6)}')`, wPrev.exp && wNow.exp ? cmpTxt(pct(wNow.exp, wPrev.exp), '比上週') : '')}${perCell(`${m+1}月`, ms, `goRp('trend','month',${y},${m})`, mPrev.exp && mNow.exp ? cmpTxt(pct(mNow.exp, mPrev.exp), '比上月') : '')}${perCell(`${y}年`, ysum, `goRp('trend','year',${y},${m})`)}</div>
     </div><div class="hc2"><div class="sec"><h3>${md(sel)} ${wdName(sel)}${sel === td ? '・今天' : ''}</h3><span class="sm"><span class="exp">${twd(-dsum.exp)}</span>　<span class="inc">${twd(dsum.inc, true)}</span></span></div>
     <div class="list">${list.length || pcs.length ? list.map(t => txnRow(t)).join('') + pcs.map(r => pieceRow(r)).join('') : `<div class="empty">這天沒消費 👍<br><button style="color:var(--acc);margin-top:8px;font-weight:600" onclick="openAdd()">＋ 記一筆</button></div>`}</div></div></div>`;
@@ -1384,6 +1389,7 @@ function renderAcctForm(){
       <div class="hint" style="margin:-4px 0 12px">刷卡日＋請款天數 超過結帳日，就自動算下期帳單（跟銀行一樣）。單筆不同時，記帳畫面可填「銀行入帳日」。</div>` : ''}
     <div class="fld"><label>顏色</label><div class="sw">${PALETTE.map(p => `<button style="background:${p}" class="${f.color === p ? 'on' : ''}" onclick="AF.color='${p}';redraw('acf')"></button>`).join('')}</div></div>
     <div class="tog"><span>列入總資產<br><small class="tx2">關閉後不計入淨資產、資產報表，收支照常統計</small></span><input type="checkbox" ${f.inNW !== false ? 'checked' : ''} onchange="AF.inNW=this.checked"></div>
+    ${f.type !== 'credit' ? `<div class="tog"><span>列入可動用<br><small class="tx2">首頁「手上可動用」算這個帳戶；存錢用的帳戶不要勾</small></span><input type="checkbox" ${(f.spend !== undefined ? f.spend !== false : ['cash', 'bank', 'epay'].includes(f.type)) ? 'checked' : ''} onchange="AF.spend=this.checked"></div>` : ''}
     ${f.id ? `<div class="tog"><span>封存（隱藏但保留紀錄）</span><input type="checkbox" ${f.archived ? 'checked' : ''} onchange="AF.archived=this.checked"></div>` : ''}
     <button class="btn" onclick="saveAcct()" style="margin-top:8px">儲存</button>
     ${f.id ? `<button class="btn del" onclick="delAcct()" style="margin-top:6px">刪除帳戶</button>` : ''}`;
@@ -1400,7 +1406,7 @@ function saveAcct(){
     id:f.id || 'a_' + uid(), name:f.name.trim(), type:f.type, currency:f.currency,
     init:cr ? -Math.abs(init) : init, initRate:f.currency !== 'TWD' && f.initRate ? parseFloat(f.initRate) : null,
     limit:cr && f.limit ? parseFloat(f.limit) : null, closeDay:cr && cd ? cd : null, dueDay:cr && dd ? dd : null,
-    color:f.color, archived:!!f.archived, inNW:f.inNW !== false, order:f.id ? (f.order ?? 0) : accList(true).length
+    color:f.color, archived:!!f.archived, inNW:f.inNW !== false, spend:f.type === 'credit' ? null : (f.spend !== undefined && f.spend !== null ? !!f.spend : ['cash', 'bank', 'epay'].includes(f.type)), order:f.id ? (f.order ?? 0) : accList(true).length
   };
   if (f.id && f.calib !== undefined && f.calib !== '' && !isNaN(parseFloat(f.calib))) {
     const v = parseFloat(f.calib), target = cr ? -Math.abs(v) : v, curBal = compute().bal[f.id] || 0;
@@ -1948,14 +1954,18 @@ function mShift(n){ const r = S.ui.rp; r.m += n; while (r.m < 0) { r.m += 12; r.
 function monthNav(left = '<span></span>'){ const r = S.ui.rp, now = new Date(), isCur = r.y === now.getFullYear() && r.m === now.getMonth();
   return `<div class="rbar">${left}<div class="nav2"><button onclick="mShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="openYM('rpm')">${r.y} 年 ${r.m + 1} 月 ▾</span><button onclick="mShift(1)" ${isCur ? 'disabled style="opacity:.3"' : ''}>${ic('right',20)}</button></div></div>`; }
 /* 多條折線（可開關、可點月份） */
-function multiLine(labels, series, selIdx, onPick){
-  const sl = labels.some(l => String(l).length > 4), W = 340, H = sl ? 206 : 180, pb = sl ? 48 : 22, pt = 14, n = labels.length, g = W / n, vis = series.filter(s => !s.off);
+function multiLine(labels, series, selIdx, onPick, goal){
+  const sl = labels.some(l => String(l).length > 4), W = 340, H = sl ? 206 : 180, pb = sl ? 48 : 22, pt = 14, n = labels.length, g = W / n, vis0 = series.filter(s => !s.off), vis = vis0.filter(s => !s.pct), pc = vis0.filter(s => s.pct);
   const all = vis.flatMap(s => s.vals), mx = Math.max(1, ...all), mn = Math.min(0, ...all), span = mx - mn || 1, y = v => pt + (mx - v) / span * (H - pb - pt);
   let out = `<line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" style="stroke:var(--line)"/>`;
   if (selIdx !== null && selIdx !== undefined) out += `<rect x="${selIdx * g}" y="${pt - 6}" width="${g}" height="${H - pb - pt + 8}" rx="6" style="fill:var(--pri-s)"/>`;
   for (const s of vis) { const pts = s.vals.map((v, i) => `${i * g + g / 2},${y(v)}`).join(' ');
     out += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${s.dash ? 2 : 2.4}" ${s.dash ? 'stroke-dasharray="5 4"' : ''} stroke-linejoin="round"/>`;
     if (!s.dash) s.vals.forEach((v, i) => out += `<circle cx="${i * g + g / 2}" cy="${y(v)}" r="2.8" fill="${s.color}"/>`); }
+  if (pc.length) { const pv = pc.flatMap(s => s.vals).concat(goal ? [goal] : []), pmx = Math.max(10, ...pv), pmn = Math.min(0, ...pv), ps = pmx - pmn || 1, yp = v => pt + (pmx - v) / ps * (H - pb - pt);
+    if (goal) out += `<line x1="0" x2="${W}" y1="${yp(goal)}" y2="${yp(goal)}" stroke="#E8A33C" stroke-width="1.4" stroke-dasharray="3 3"/><text x="${W - 2}" y="${yp(goal) - 3}" text-anchor="end" font-size="9" style="fill:#E8A33C">目標 ${goal}%</text>`;
+    for (const s of pc) { out += `<polyline points="${s.vals.map((v, i) => `${i * g + g / 2},${yp(v)}`).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`; s.vals.forEach((v, i) => out += `<circle cx="${i * g + g / 2}" cy="${yp(v)}" r="2.6" fill="${s.color}"/>`); }
+    out += `<text x="${W - 2}" y="10" text-anchor="end" font-size="10" style="fill:var(--tx2)">${pmx.toFixed(0)}%</text>`; }
   labels.forEach((l, i) => out += sl ? `<text x="${i * g + g / 2 + 3}" y="${H - pb + 12}" text-anchor="end" font-size="10" transform="rotate(-45 ${i * g + g / 2 + 3} ${H - pb + 12})" style="fill:var(--tx2)">${l}</text>`
     : `<text x="${i * g + g / 2}" y="${H - 6}" text-anchor="middle" font-size="10" style="fill:var(--tx2)">${l}</text>`);
   if (onPick) labels.forEach((l, i) => out += `<rect x="${i * g}" y="0" width="${g}" height="${H}" fill="transparent" style="cursor:pointer" onclick="${onPick}(${i})"/>`);
@@ -1963,7 +1973,7 @@ function multiLine(labels, series, selIdx, onPick){
   return `<div class="chart"><svg viewBox="${sl ? '-22 0 ' + (W + 22) : '0 0 ' + W} ${H}">${out}</svg></div>`;
 }
 function ovPick(i){ UX.ovSel = UX.ovSel === i ? null : i; render(); }
-function ovTog(k){ UX.ovHide[k] = !UX.ovHide[k]; render(); }
+function ovTog(k){ UX.ovHide[k] = k === 'sr' ? UX.ovHide.sr === false : !UX.ovHide[k]; render(); }
 const smallMax = () => +S.settings.smallMax || 200;
 function setSmallMax(){ const v = parseInt(prompt('小額消費門檻（元，含以下）', smallMax())); if (v > 0) putSettings({smallMax:v}); }
 const isInstT = t => !!(t.inst && t.inst.n > 1);
@@ -1971,7 +1981,7 @@ const isInstT = t => !!(t.inst && t.inst.n > 1);
 function viewOverview(){
   const r = S.ui.rp, ov = r.ov || '6', now = new Date(), td = today(), cy = r.y, cm = r.m, isCur = cy === now.getFullYear() && cm === now.getMonth();
   const [f0, t0] = mRange(cy, cm), cut = isCur ? td : t0, [py, pm] = prevYM(cy, cm);
-  const leg = (k, l, c, dash) => `<button class="${UX.ovHide[k] ? 'off' : ''}" onclick="ovTog('${k}')"><i style="background:${dash ? 'repeating-linear-gradient(90deg,' + c + ' 0 4px,transparent 4px 7px)' : c}"></i>${l}</button>`;
+  const leg = (k, l, c, dash) => `<button class="${(k === 'sr' ? UX.ovHide.sr !== false : UX.ovHide[k]) ? 'off' : ''}" onclick="ovTog('${k}')"><i style="background:${dash ? 'repeating-linear-gradient(90deg,' + c + ' 0 4px,transparent 4px 7px)' : c}"></i>${l}</button>`;
   const CR = ov === 'c' ? ovRange() : null, ymS = (y, m) => `${y}/${p2(m + 1)}`;
   const chips = `<div class="chipz">${[['6', '近 6 個月'], ['12', '近 12 個月'], ['m', `${ymS(cy, cm)}（每天）`], ['c', CR ? `${CR.label}` : '自訂區間']].map(([k, l]) => `<button class="${ov === k ? 'on' : ''}" onclick="${k === 'c' ? 'openOvRange()' : `S.ui.rp.ov='${k}';UX.ovSel=null;render()`}">${l}</button>`).join('')}<button style="margin-left:auto;color:var(--acc);font-weight:700" onclick="openCmp()">比較 ›</button></div>`;
   const hasFixed = (S.settings.fixed || []).length > 0;
@@ -2000,11 +2010,12 @@ function viewOverview(){
   } else {
     const N = CR ? CR.months.length : +ov, ms = (CR ? CR.months : monthsBack(cy, cm, N)).map(([y, m]) => monthStat(y, m, CR ? CR.cut : null)), lbl = ms.map(x => ymS(x.y, x.m));
     const ser = [{k:'inc', l:'收入', vals:ms.map(x => x.inc), color:'var(--inc)'}, {k:'exp', l:'支出', vals:ms.map(x => x.exp), color:'var(--exp)'},
-      {k:'net', l:'結餘', vals:ms.map(x => x.net), color:'var(--acc)', dash:1}, ...(hasFixed ? [{k:'save', l:'可省支出', vals:ms.map(x => x.save), color:'#E8A33C'}] : [])].map(x => ({...x, off:!!UX.ovHide[x.k]}));
+      {k:'net', l:'結餘', vals:ms.map(x => x.net), color:'var(--acc)', dash:1}, ...(hasFixed ? [{k:'save', l:'可省支出', vals:ms.map(x => x.save), color:'#E8A33C'}] : []),
+      {k:'sr', l:'儲蓄率 %', vals:ms.map(x => x.inc ? x.net / x.inc * 100 : 0), color:'#8E6CC0', pct:1}].map(x => ({...x, off:x.k === 'sr' ? UX.ovHide.sr !== false : !!UX.ovHide[x.k]}));
     const si = UX.ovSel !== null && UX.ovSel < N ? UX.ovSel : null, sx = si !== null ? ms[si] : null;
-    main = `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>收支趨勢</h3><span class="sm tx2">點月份看數字</span></div>${multiLine(lbl, ser, si, 'ovPick')}
+    main = `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>收支趨勢</h3><span class="sm tx2">點月份看數字</span></div>${multiLine(lbl, ser, si, 'ovPick', UX.ovHide.sr === false ? S.settings.srGoal : null)}
       <div class="lg2">${ser.map(x => leg(x.k, x.l, x.color, x.dash)).join('')}</div>
-      ${sx ? `<div class="selbox"><b>${ymS(sx.y, sx.m)}</b><span class="inc">收入 ${twd(sx.inc)}</span><span class="exp">支出 ${twd(sx.exp)}</span><span>結餘 ${twd(sx.net)}</span>${hasFixed ? `<span class="tx2">固定 ${twd(sx.fix)}・可省 ${twd(sx.save)}</span>` : ''}</div>` : ''}
+      ${sx ? `<div class="selbox"><b>${ymS(sx.y, sx.m)}</b><span class="inc">收入 ${twd(sx.inc)}</span><span class="exp">支出 ${twd(sx.exp)}</span><span>結餘 ${twd(sx.net)}</span><span style="color:#8E6CC0">儲蓄率 ${sx.inc ? (sx.net / sx.inc * 100).toFixed(0) : 0}%</span>${hasFixed ? `<span class="tx2">固定 ${twd(sx.fix)}・可省 ${twd(sx.save)}</span>` : ''}</div>` : ''}
       ${hasFixed ? '' : `<div class="sm tx2" style="margin-top:6px">想看「可省支出」？<button style="color:var(--acc);font-weight:600" onclick="openFixed()">設定固定支出分類</button></div>`}</div>`;
     const cur = monthStat(cy, cm), prevS = monthStat(py, pm, isCur ? sameDayCut(py, pm, td) : null), done = ms.slice(0, -1), prevFull = done[done.length - 1];
     const sr = x => x && x.inc ? x.net / x.inc * 100 : 0, avg = done.length ? done.reduce((s2, x) => s2 + x.exp, 0) / done.length : 0, cp = pct(cur.exp, prevS.exp);
@@ -2012,11 +2023,11 @@ function viewOverview(){
     const yoy = ly0 < fst.slice(0, 8) + '01' ? '<span class="tx2 cmp">去年無資料</span>' : lyS.exp ? cmpTxt(pct(cur.exp, lyS.exp), '比去年同期') : '<span class="tx2 cmp">去年同期無支出</span>';
     if (CR) { const T = ms.reduce((o, x) => ({inc:o.inc + x.inc, exp:o.exp + x.exp}), {inc:0, exp:0}), net = T.inc - T.exp;
       main += `<div class="card"><div class="ovk"><div><small>期間收入</small><b class="inc">${twd(T.inc)}</b></div><div><small>期間支出</small><b class="exp">${twd(T.exp)}</b><span class="tx2">月均 ${twd(T.exp / N)}</span></div>
-        <div><small>結餘・儲蓄率</small><b class="${net < 0 ? 'exp' : ''}">${twd(net)}</b><span style="color:${net >= 0 ? 'var(--acc)' : 'var(--exp)'}">${T.inc ? (net / T.inc * 100).toFixed(0) : 0}%</span></div></div></div>`; }
-    else main += `<div class="card"><div class="ovk"><div><small>${isCur ? '本月' : ymS(cy, cm)} 儲蓄率</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span></div>
+        <div><small>結餘・儲蓄率</small><b class="${net < 0 ? 'exp' : ''}">${twd(net)}</b><span style="color:${net >= 0 ? 'var(--acc)' : 'var(--exp)'}">${T.inc ? (net / T.inc * 100).toFixed(0) : 0}%${S.settings.srGoal ? `（目標 ${S.settings.srGoal}%）` : ''}</span></div></div></div>`; }
+    else main += `<div class="card"><div class="ovk"><div><small>${isCur ? '本月' : ymS(cy, cm)} 儲蓄率</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span>${S.settings.srGoal ? `<span style="color:${sr(cur) >= S.settings.srGoal ? 'var(--acc)' : 'var(--exp)'}">目標 ${S.settings.srGoal}%・${sr(cur) >= S.settings.srGoal ? '達成' : '未達'}</span>` : ''}</div>
       <div><small>月均支出</small><b>${twd(avg)}</b><span class="tx2">前 ${done.length} 個月</span></div>
       <div><small>支出比上月</small><b style="color:${cp > 0 ? 'var(--exp)' : 'var(--acc)'}">${prevS.exp ? (cp > 0 ? '+' : '−') + Math.abs(cp).toFixed(0) + '%' : '—'}</b><span class="tx2">${isCur ? '同期比較' : '整月比較'}</span>${yoy}</div></div></div>`;
-    main += `<div class="card" style="padding:12px 16px"><table class="tbl"><tr><th>月份</th><th>收入</th><th>支出</th><th>結餘</th></tr>${ms.slice().reverse().map((x, i) => `<tr onclick="S.ui.rp={...S.ui.rp,y:${x.y},m:${x.m},ov:'m'};render()" style="cursor:pointer"><td>${ymS(x.y, x.m)}</td><td class="inc">${twd(x.inc)}</td><td class="exp">${twd(x.exp)}</td><td class="${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td></tr>`).join('')}</table></div>`;
+    main += `<div class="card" style="padding:12px 16px"><table class="tbl"><tr><th>月份</th><th>收入</th><th>支出</th><th>結餘</th><th>儲蓄率</th></tr>${ms.slice().reverse().map((x, i) => `<tr onclick="S.ui.rp={...S.ui.rp,y:${x.y},m:${x.m},ov:'m'};render()" style="cursor:pointer"><td>${ymS(x.y, x.m)}</td><td class="inc">${twd(x.inc)}</td><td class="exp">${twd(x.exp)}</td><td class="${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td><td style="color:${x.inc && S.settings.srGoal && x.net / x.inc * 100 >= S.settings.srGoal ? 'var(--acc)' : 'var(--tx2)'}">${x.inc ? (x.net / x.inc * 100).toFixed(0) + '%' : '—'}</td></tr>`).join('')}</table></div>`;
   }
   // 這個月變多的分類（比近 3 個月同期平均）；自訂區間：比前一段同長度
   let F0 = f0, T0 = t0, CUT = cut;
@@ -2057,26 +2068,87 @@ function openOvRange(){
     <div class="two"><div class="fld"><label>從（月份）</label><input type="month" value="${S.ui.rp.cf}" onchange="S.ui.rp.cf=this.value"></div><div class="fld"><label>到（月份）</label><input type="month" value="${S.ui.rp.ct}" onchange="S.ui.rp.ct=this.value"></div></div>
     <button class="btn" onclick="S.ui.rp.ov='c';UX.ovSel=null;closeLayer('ovr');render()">套用</button>`), 'btm');
 }
+/* ===== v2.35 手上可動用：勾「列入可動用」的帳戶餘額 −（列入資產的信用卡 本期未繳＋下期待繳） ===== */
+const spendable = a => a.type !== 'credit' && !a.archived && (a.spend !== undefined ? a.spend !== false : ['cash', 'bank', 'epay'].includes(a.type));
+function availNow(){
+  const c = compute(); let have = 0, card = 0;
+  for (const a of Object.values(S.data.accounts)) {
+    if (spendable(a)) have += (c.bal[a.id] || 0) * rate(a.currency);
+    else if (a.type === 'credit' && !a.archived && a.inNW !== false) { const ci = cardInfo(a); card += (ci ? ci.remain + ci.post : Math.max(0, -(c.bal[a.id] || 0))) * rate(a.currency); }
+  }
+  return {have, card, avail:have - card};
+}
+/* 發薪日（可多個）：遇週末自動提前到週五；國定假日不抓資料，由使用者在首頁改當月實際發薪日（S.settings.payOv） */
+function isOffDay(d){ const w = pd(d).getDay(); return w === 0 || w === 6; }
+function payDate(y, m, day){ let d = ds(new Date(y, m, Math.min(day, dim(y, m)))); for (let i = 0; i < 3 && isOffDay(d); i++) d = addD(d, -1); return d; }
+function payNext(){
+  const days = (S.settings.paydays || []).map(Number).filter(n => n >= 1 && n <= 31); if (!days.length) return null;
+  const td = today(), t = pd(td), ov = S.settings.payOv || {}; let best = null;
+  for (let k = 0; k < 3; k++) { const y = t.getFullYear() + Math.floor((t.getMonth() + k) / 12), m = (t.getMonth() + k) % 12;
+    for (const dd of days) { const auto = payDate(y, m, dd), real = ov[auto] || auto; if (real > td && (!best || real < best.real)) best = {auto, real}; } }
+  return best;
+}
+function nextPayday(){ const n = payNext(); return n ? n.real : null; }
+/* 首頁點「到 X/X」：改這一次的實際發薪日（例：遇國定假日提前），以自動算出的日期為 key */
+function setPayOv(){
+  const n = payNext(); if (!n) return setPaydays();
+  const v = prompt(`下次發薪日 ${n.real.replace(/-/g, '/')}${n.real !== n.auto ? `（原本 ${n.auto.replace(/-/g, '/')}）` : ''}。
+遇國定假日提前或延後，填實際日期（例：2026/11/04）；留空＝改回 ${n.auto.replace(/-/g, '/')}`, n.real.replace(/-/g, '/'));
+  if (v === null) return; const ov = {...(S.settings.payOv || {})}, d = v.trim().replace(/\//g, '-');
+  if (!d || d === n.auto) delete ov[n.auto];
+  else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(d)) { const [yy, mm, dd] = d.split('-').map(Number); ov[n.auto] = ds(new Date(yy, mm - 1, dd)); }
+  else return toast('日期格式：2026/11/04');
+  const lim = addM(today(), -2); for (const k of Object.keys(ov)) if (k < lim) delete ov[k];
+  putSettings({payOv:ov}); toast(`下次發薪：${md(nextPayday())}`);
+}
+function setPaydays(){
+  const v = prompt('發薪日（每月幾號；多個用逗號分開，例：5,20）\n遇週末自動提前到週五；國定假日請在首頁點「到 X/X」改當月日期；留空＝不用', (S.settings.paydays || []).join(','));
+  if (v === null) return; const arr = [...new Set(v.split(/[,，、\s]+/).map(Number).filter(n => n >= 1 && n <= 31))].sort((a, b) => a - b);
+  putSettings({paydays:arr}); toast(arr.length ? `下次發薪：${md(nextPayday())}` : '已清除發薪日');
+}
+function setSrGoal(){
+  const v = prompt('儲蓄率目標 %（例：20 或 30；留空＝不設）', S.settings.srGoal || '');
+  if (v === null) return; const n = parseFloat(v); putSettings({srGoal:n > 0 && n < 100 ? n : null});
+}
 /* ===== v2.34 比較頁（上一期／去年同期） ===== */
-let CMP = {per:'month', base:'prev', from:'', to:''};
+let CMP = {per:'month', base:'prev', from:'', to:'', off:0};
 const addY = (s, k) => addM(s, 12 * k), fD = s => `${s.replace(/-/g, '/')}（${WD[pd(s).getDay()]}）`;
 function cmpRanges(){
-  const td = today(), d = pd(td); let a0, a1 = td;
-  if (CMP.per === 'month') a0 = ds(new Date(d.getFullYear(), d.getMonth(), 1));
-  else if (CMP.per === 'week') a0 = wkStart(td);
-  else if (CMP.per === 'year') a0 = `${d.getFullYear()}-01-01`;
-  else { a0 = CMP.from || ds(new Date(d.getFullYear(), d.getMonth(), 1)); a1 = CMP.to || td; if (a1 < a0) [a0, a1] = [a1, a0]; }
+  const td = today(), d = pd(td), o = Math.min(0, CMP.off || 0); let a0, a1 = td, cur = o === 0, lbl = '';
+  /* 期間結束日：本期算到今天；過去的期間算整段 */
+  const endOf = (s, kind) => kind === 'month' ? (() => { const x = pd(s); return ds(new Date(x.getFullYear(), x.getMonth(), dim(x.getFullYear(), x.getMonth()))); })() : kind === 'week' ? addD(s, 6) : `${s.slice(0, 4)}-12-31`;
+  if (CMP.per === 'month') { a0 = ds(new Date(d.getFullYear(), d.getMonth() + o, 1)); lbl = a0.slice(0, 7).replace('-', '/'); }
+  else if (CMP.per === 'week') { a0 = addD(wkStart(td), 7 * o); lbl = `${a0.replace(/-/g, '/')} 週`; }
+  else if (CMP.per === 'year') { a0 = `${d.getFullYear() + o}-01-01`; lbl = `${d.getFullYear() + o} 年`; }
+  else { a0 = CMP.from || ds(new Date(d.getFullYear(), d.getMonth(), 1)); a1 = CMP.to || td; if (a1 < a0) [a0, a1] = [a1, a0]; cur = false; }
+  if (CMP.per !== 'custom') a1 = cur ? td : endOf(a0, CMP.per);
   let b0, b1;
-  if (CMP.base === 'yoy' || CMP.per === 'year') { b0 = addY(a0, -1); b1 = addY(a1, -1); }
-  else if (CMP.per === 'month') { b0 = addM(a0, -1); b1 = addM(a1, -1); }
+  if (CMP.base === 'yoy' || CMP.per === 'year') { b0 = addY(a0, -1); b1 = cur || CMP.per === 'custom' ? addY(a1, -1) : endOf(b0, CMP.per === 'custom' ? 'month' : CMP.per); if (CMP.per === 'week') b1 = cur ? addD(b0, diffD(a1, a0)) : addD(b0, 6); }
+  else if (CMP.per === 'month') { b0 = addM(a0, -1); b1 = cur ? addM(a1, -1) : endOf(b0, 'month'); }
   else if (CMP.per === 'week') { b0 = addD(a0, -7); b1 = addD(a1, -7); }
   else { const len = diffD(a1, a0); b1 = addD(a0, -1); b0 = addD(b1, -len); }
-  return {a0, a1, b0, b1};
+  if (CMP.base === 'yoy' && CMP.per === 'week') { b0 = wkStart(addY(a0, -1)); b1 = addD(b0, diffD(a1, a0)); }
+  return {a0, a1, b0, b1, lbl, cur};
 }
-function openCmp(){ openLayer('cmp', renderCmp, 'full'); }
+function cmpShift(n){ CMP.off = Math.min(0, (CMP.off || 0) + n); redraw('cmp'); }
+function cmpPick(){
+  const td = today(), d = pd(td), per = CMP.per, cur = cmpRanges().a0;
+  const go = v => { if (!v) return; const x = pd(per === 'year' ? v + '-01-01' : per === 'month' ? v + '-01' : v);
+    CMP.off = per === 'month' ? (x.getFullYear() - d.getFullYear()) * 12 + x.getMonth() - d.getMonth() : per === 'year' ? x.getFullYear() - d.getFullYear() : Math.round(diffD(wkStart(ds(x)), wkStart(td)) / 7);
+    CMP.off = Math.min(0, CMP.off); closeLayer('cmpk'); redraw('cmp'); };
+  window._cmpGo = go;
+  const inp = per === 'month' ? `<input type="month" value="${cur.slice(0, 7)}" onchange="_cmpGo(this.value)">` : per === 'week' ? `<input type="date" value="${cur}" onchange="_cmpGo(this.value)">`
+    : `<select onchange="_cmpGo(this.value)">${Array.from({length:8}, (_, i) => d.getFullYear() - i).map(y => `<option value="${y}" ${cur.startsWith(y) ? 'selected' : ''}>${y} 年</option>`).join('')}</select>`;
+  openLayer('cmpk', () => sheet('cmpk', per === 'month' ? '選月份' : per === 'week' ? '選一天（看那一週）' : '選年份', `<div class="fld">${inp}</div>`), 'btm');
+}
+/* 比較頁左右滑動切換期間 */
+function cmpMount(el){ let x0 = null, y0 = 0; el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, {passive:true});
+  el.addEventListener('touchend', e => { if (x0 === null || CMP.per === 'custom') return; const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null;
+    if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5) cmpShift(dx > 0 ? -1 : 1); }, {passive:true}); }
+function openCmp(){ CMP.off = 0; openLayer('cmp', renderCmp, 'full', cmpMount); }
 function renderCmp(){
-  const {a0, a1, b0, b1} = cmpRanges(), A = summary(a0, a1), B = summary(b0, b1), fst = (compute().list[0] || {}).date || today(), noB = b1 < fst;
-  const sg = (k, l, key) => `<button class="${CMP[key] === k ? 'on' : ''}" onclick="CMP.${key}='${k}';redraw('cmp')">${l}</button>`;
+  const {a0, a1, b0, b1, lbl, cur} = cmpRanges(), A = summary(a0, a1), B = summary(b0, b1), fst = (compute().list[0] || {}).date || today(), noB = b1 < fst;
+  const sg = (k, l, key) => `<button class="${CMP[key] === k ? 'on' : ''}" onclick="CMP.${key}='${k}';${key === 'per' ? 'CMP.off=0;' : ''}redraw('cmp')">${l}</button>`;
   const sr = x => x.inc ? (x.inc - x.exp) / x.inc * 100 : 0, dif = (a, b, good) => { const d = a - b, p = b ? d / Math.abs(b) * 100 : null, c = Math.abs(d) < 1 ? 'tx2' : (d > 0) === good ? 'inc' : 'exp';
     return `<td class="${c}">${d > 0 ? '+' : d < 0 ? '−' : ''}${twd(Math.abs(d))}</td><td class="${c}">${p === null ? '—' : (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p).toFixed(0) + '%'}</td>`; };
   const row = (l, a, b, good, isP) => `<tr><td>${l}</td><td>${isP ? a.toFixed(0) + '%' : twd(a)}</td><td>${noB ? '—' : isP ? b.toFixed(0) + '%' : twd(b)}</td>${noB ? '<td>—</td><td>—</td>' : isP ? `<td class="${a >= b ? 'inc' : 'exp'}">${a >= b ? '+' : '−'}${Math.abs(a - b).toFixed(0)} 點</td><td></td>` : dif(a, b, good)}</tr>`;
@@ -2095,13 +2167,14 @@ function renderCmp(){
   const sameB = cumB[Math.min(la, lb) - 1] || 0;
   return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('cmp')">${ic('left',24)}</button><h2>比較</h2><span style="width:40px"></span></div>
     <div class="fscroll">
-      <div class="segw"><div class="seg">${sg('month', '本月', 'per')}${sg('week', '本週', 'per')}${sg('year', '今年', 'per')}${sg('custom', '自訂', 'per')}</div></div>
+      <div class="segw"><div class="seg">${sg('month', '月', 'per')}${sg('week', '週', 'per')}${sg('year', '年', 'per')}${sg('custom', '自訂', 'per')}</div></div>
+      ${CMP.per !== 'custom' ? `<div class="rbar" style="justify-content:center"><div class="nav2"><button onclick="cmpShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="cmpPick()">${lbl}${cur ? '（到今天）' : ''} ▾</span><button onclick="cmpShift(1)" ${cur ? 'disabled style="opacity:.3"' : ''}>${ic('right',20)}</button></div></div>` : ''}
       ${CMP.per === 'custom' ? `<div class="two" style="margin:4px 16px 0"><input type="date" value="${a0}" onchange="CMP.from=this.value;redraw('cmp')" style="border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg)"><input type="date" value="${a1}" onchange="CMP.to=this.value;redraw('cmp')" style="border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg)"></div>` : ''}
       <div class="segw" style="margin-top:6px"><div class="seg">${CMP.per === 'year' ? '<button class="on">去年同期</button>' : sg('prev', CMP.per === 'week' ? '上週' : CMP.per === 'month' ? '上月' : '前一段', 'base') + sg('yoy', '去年同期', 'base')}</div></div>
       <div class="card"><div class="sm"><b>本期</b> ${fD(a0)}～${fD(a1)}</div><div class="sm tx2" style="margin-top:2px"><b>比較期</b> ${fD(b0)}～${fD(b1)}</div>
         ${noB ? '<div class="sm exp" style="margin-top:6px">比較期沒有資料（記帳從 ' + fst.replace(/-/g, '/') + ' 開始）</div>' : ''}
         <table class="tbl cmpt" style="margin-top:8px"><tr><th></th><th>本期</th><th>比較期</th><th>差額</th><th>%</th></tr>
-        ${row('收入', A.inc, B.inc, true)}${row('支出', A.exp, B.exp, false)}${row('結餘', A.inc - A.exp, B.inc - B.exp, true)}${row('儲蓄率', sr(A), sr(B), true, true)}</table></div>
+        ${row('收入', A.inc, B.inc, true)}${row('支出', A.exp, B.exp, false)}${row('結餘', A.inc - A.exp, B.inc - B.exp, true)}${row('儲蓄率' + (S.settings.srGoal ? `<br><small class="tx2">目標 ${S.settings.srGoal}%</small>` : ''), sr(A), sr(B), true, true)}</table></div>
       <div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>累計支出</h3><span class="sm tx2">第 1 天對第 1 天</span></div>
         <div class="chart"><svg viewBox="-22 0 ${W + 22} ${H}"><line x1="0" x2="${W}" y1="${yv(0)}" y2="${yv(0)}" style="stroke:var(--line)"/>${pl(cumB, 'var(--tx2)', 1)}${pl(cumA, 'var(--exp)')}${ax}<text x="2" y="10" font-size="10" style="fill:var(--tx2)">${twd(M)}</text></svg></div>
         <div class="lg2"><button><i style="background:var(--exp)"></i>本期</button><button><i style="background:repeating-linear-gradient(90deg,var(--tx2) 0 4px,transparent 4px 7px)"></i>比較期</button></div>
@@ -2994,6 +3067,8 @@ function viewSettings(){
     <div class="grp"><span>資料</span></div>
     <div class="list set">
       <button class="row" onclick="S.ui.rp.seg='budget';go('reports')"><span class="mid"><b>預算</b><small>${hasBudget() ? '已設定' : '未設定'}</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="setPaydays()"><span class="mid"><b>發薪日</b><small>${(S.settings.paydays || []).length ? `每月 ${S.settings.paydays.join('、')} 號・下次 ${nextPayday() ? nextPayday().replace(/-/g, '/') : '—'}（週末提前；國定假日在首頁點日期改）` : '未設定 · 首頁「每天可花」會用到'}</small></span>${ic('right',18)}</button>
+      <button class="row" onclick="setSrGoal()"><span class="mid"><b>儲蓄率目標</b><small>${S.settings.srGoal ? S.settings.srGoal + '%・報表趨勢圖、比較頁會標出' : '未設定'}</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openFixed()"><span class="mid"><b>固定支出分類</b><small>${(S.settings.fixed || []).length ? (S.settings.fixed || []).map(id => S.data.categories[id]?.name).filter(Boolean).join('、') : '未設定 · 報表「可省支出」會用到'}</small></span>${ic('right',18)}</button>
       <div class="row"><span class="mid"><b>分期利息按月認列</b><small>報表的「手續費」照每期帳單月份算（跟銀行一樣）；關掉＝整筆算在刷卡日</small></span><input type="checkbox" style="width:22px;height:22px;accent-color:var(--acc);flex:none" ${S.settings.feeByPeriod !== false ? 'checked' : ''} onchange="putSettings({feeByPeriod:this.checked})"></div>
       <button class="row" onclick="openRules()"><span class="mid"><b>固定收支</b><small>${Object.values(S.data.recurring || {}).filter(r => r.active !== false).length} 個進行中</small></span>${ic('right',18)}</button>
