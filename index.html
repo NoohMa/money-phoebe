@@ -332,7 +332,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.36';
+const VERSION = 'v2.37';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -391,7 +391,7 @@ const ICONS = {
   card:'M2 5h20v14H2zM2 10h20M6 15h4',
   wallet:'M3 6h15a3 3 0 0 1 3 3v9a2 2 0 0 1-2 2H3zM3 6V5a2 2 0 0 1 2-2h11v3M16 13h.01',
   swap:'M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
-  plus:'M12 5v14M5 12h14',
+  plus:'M12 5v14M5 12h14', cart:'M3 4h2.5l2.2 10.5h10.1L20 7.5H6.4M9.5 19.5h.01M16.5 19.5h.01',
   homeNav:'M4 10l8-6 8 6v10h-5v-6H9v6H4z',
   barcode:'M4 5v14M7 5v14M10 5v10M13 5v14M16 5v10M19 5v14',
   gear:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
@@ -753,7 +753,8 @@ function ovOf(a, close){ const h = a.stmtOverrides || {}; if (h[close] !== undef
 /* 某期帳單的繳款＝結帳日隔天到下一個結帳日之間轉進這張卡的錢 */
 function paysFor(a, close){ const nx = closeAdd(a, close, 1); return compute().list.filter(t => ((t.type === 'transfer' && t.toAccountId === a.id && t.accountId !== a.id) || (t.type === 'income' && t.accountId === a.id)) && t.date > close && t.date <= nx); }
 function curClose(a){ const td = today(), c = closeOf(a, td); return c > td ? closeAdd(a, c, -1) : c; }
-function dueOf(a, close){ const d = pd(close), y = d.getFullYear(), m = d.getMonth() + (a.dueDay > a.closeDay ? 0 : 1); const yy = y + Math.floor(m / 12), mm = m % 12; return ds(new Date(yy, mm, Math.min(a.dueDay, dim(yy, mm)))); }
+function dueOf(a, close){ const d = pd(close), y = d.getFullYear(), m = d.getMonth() + (a.dueDay > a.closeDay ? 0 : 1); const yy = y + Math.floor(m / 12), mm = m % 12;
+  let r = ds(new Date(yy, mm, Math.min(a.dueDay, dim(yy, mm)))); for (let i = 0; i < 2 && isOffDay(r); i++) r = addD(r, 1); return r; }   // v2.37：遇週六日順延到週一（國定假日不抓）
 function cardInfoRaw(a){
   const td = today(), close = curClose(a), next = closeAdd(a, close, 1), due = dueOf(a, close), c = compute(), s = cycleCalc(a, close, next);
   const auto = Math.max(0, -s.stmt), rawRemain = Math.max(0, Math.max(0, -s.raw) - s.paid);
@@ -945,8 +946,10 @@ function alerts(){
   if (S.mode === 'local' && /^https?:/.test(location.protocol) && !/localhost|127\.0\.0\.1/.test(location.hostname)) out.unshift(`<div class="alert warn">${ic('bell',18)}<span>尚未設定雲端（config.js），資料只存在這台裝置</span></div>`);
   for (const a of accList()) {
     const ci = cardInfo(a); if (!ci || ci.remain <= 0) continue;
-    if (ci.left < 0) out.push(`<div class="alert warn">${ic('bell',18)}<span><b>${esc(a.name)}</b> 已逾期 ${-ci.left} 天，未繳 ${fmt(ci.remain, a.currency)}</span></div>`);
-    else if (ci.left <= 7) out.push(`<div class="alert">${ic('bell',18)}<span><b>${esc(a.name)}</b> ${ci.left === 0 ? '今天' : ci.left + ' 天後'}截止（${md(ci.due)}），未繳 ${fmt(ci.remain, a.currency)}</span></div>`);
+    const go_ = `style="width:calc(100% - 32px);text-align:left" onclick="openStmt('${a.id}','${ci.close}')"`, tail = `<span style="flex:1"></span>${ic('right',16)}`;
+    if (ci.left < -3) out.push(`<button class="alert warn" ${go_}>${ic('bell',18)}<span><b>${esc(a.name)}</b> 已逾期 ${-ci.left} 天，未繳 ${fmt(ci.remain, a.currency)}</span>${tail}</button>`);
+    else if (ci.left < 0) out.push(`<button class="alert" ${go_}>${ic('bell',18)}<span><b>${esc(a.name)}</b> ${md(ci.due)} 截止已過，還沒記繳款 ${fmt(ci.remain, a.currency)}</span>${tail}</button>`);
+    else if (ci.left <= 7) out.push(`<button class="alert" ${go_}>${ic('bell',18)}<span><b>${esc(a.name)}</b> ${ci.left === 0 ? '今天' : ci.left + ' 天後'}截止（${md(ci.due)}），未繳 ${fmt(ci.remain, a.currency)}</span>${tail}</button>`);
   }
   return out.join('');
 }
@@ -984,7 +987,7 @@ function viewHome(){
     <div class="list">${list.length || pcs.length ? list.map(t => txnRow(t)).join('') + pcs.map(r => pieceRow(r)).join('') : `<div class="empty">這天沒消費 👍<br><button style="color:var(--acc);margin-top:8px;font-weight:600" onclick="openAdd()">＋ 記一筆</button></div>`}</div></div></div>`;
 }
 function goRp(seg, per, y, m, type){ const r = S.ui.rp; S.ui.rp = {...r, seg, per:per || r.per, y:y ?? r.y, m:m ?? r.m, type:type || r.type}; go('reports'); }
-function openRange(from, to){ SR = {q:'', type:'', acc:'', cat:'', proj:'', from, to, min:'', max:'', limit:100, more:true}; openSearch(); }
+function openRange(from, to, type){ SR = {q:'', type:type || '', acc:'', cat:'', proj:'', from, to, min:'', max:'', limit:100, more:true}; openSearch(); }
 function selDay(x){ S.ui.sel = x; render(); }
 function pickMonth(v){ if (!v) return; const [y, m] = v.split('-').map(Number); const cur = pd(S.ui.sel); S.ui.sel = ds(new Date(y, m-1, Math.min(cur.getDate(), dim(y, m-1)))); render(); }
 
@@ -1063,14 +1066,14 @@ function viewAcct(){
   if (ci) { const f = v => fmt(v, a.currency), ln = (label, v, cls, click, note) => `<div class="${click ? 'tap' : ''}" ${click ? `onclick="${click}"` : ''} style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 2px;border-top:1px solid var(--line)"><span><span class="tx2">${label}${click ? ' ›' : ''}</span>${note ? `<br><small class="tx2">${note}</small>` : ''}</span><b class="${cls || ''}">${f(v)}</b></div>`;
     info = `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px"><div class="tap" onclick="openDebt('${a.id}')"><small class="tx2">待繳總額 ›</small><div style="font-size:28px;font-weight:800" class="${ci.debt >= 1 ? 'exp' : 'inc'}">${f(ci.debt)}${ci.debt < 1 ? '<span style="font-size:15px;margin-left:8px">✓ 已全部繳清</span>' : ''}</div></div>${ci.over ? `<div style="text-align:right"><small class="tx2">溢繳</small><div class="inc b">${f(ci.over)}</div></div>` : ''}</div>
-    ${ln(`本期未繳（${md(ci.due)} 截止・${ci.left >= 0 ? '剩 ' + ci.left + ' 天' : '已逾期'}）`, ci.remain, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`, `${md(ci.close)} 帳單 ${f(ci.owed)}${ci.manual ? '（依帳單）' : ''}・已繳 ${f(ci.paid)}${ci.off.r >= 1 ? `・回饋退款抵扣 ${f(ci.off.r)}` : ''}`)}
+    ${ln(`本期未繳（${md(ci.due)} 截止・${ci.left >= 0 ? '剩 ' + ci.left + ' 天' : ci.left >= -3 ? '已過截止日' : '已逾期'}）`, ci.remain, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`, `${md(ci.close)} 帳單 ${f(ci.owed)}${ci.manual ? '（依帳單）' : ''}・已繳 ${f(ci.paid)}${ci.off.r >= 1 ? `・回饋退款抵扣 ${f(ci.off.r)}` : ''}`)}
     ${ln('下期待繳', ci.post, '', `openStmt('${a.id}','${ci.next}')`, `${md(ci.next)} 結帳・結帳後新增 ${f(Math.max(0, ci.newPost))}${ci.nextInst ? `＋分期 ${f(ci.nextInst)}` : ''}${ci.off.p >= 1 ? `−已抵扣 ${f(ci.off.p)}` : ''}${ci.miss >= 1 ? `＋上期未結清 ${f(ci.miss)}` : ''}`)}
     ${(() => { const live = [...compute().list.filter(t => t.type === 'expense' && t.accountId === a.id && t.inst && t.inst.n > 1 && !t.inst.payoff).map(t => instStatus(t)),
         ...Object.values(S.data.plans || {}).filter(pl => pl.accountId === a.id && !pl.payoff).map(pl => planStatus(pl, ci))].filter(st => st.left > 0);
       const mx = live.reduce((m, st) => st.left > m.left ? st : m, {left:0, last:''}), sum = live.length ? `${live.length} 筆分期・最長剩 ${mx.left} 期（到 ${mx.last.slice(0, 7).replace('-', '/')}）・` : '';
       return ln('分期未入帳', ci.unbilled, '', ci.unbilled >= 1 ? `openFuture('${a.id}')` : '', `${sum}${md(closeAdd(a, ci.next, 1))} 以後的分期${ci.off.u >= 1 ? `・已預繳抵扣 ${f(ci.off.u)}` : ''}`); })()}
     ${Math.abs(ci.diff) >= 1 && !ci.over ? ln(ci.manual ? '帳單與 App 推算差額' : '銀行與 App 紀錄累計差', ci.diff, 'tx2', `openStmt('${a.id}','${ci.close}')`, ci.manual ? `你輸入的帳單 ${f(ci.owed)}，App 算 ${f(ci.auto)}。通常是漏記回饋／退款、手續費或日期，點這裡逐筆對照` : `${md(ci.anchor)} 那期以銀行帳單為準後，帳單從銀行數字接著算；App 紀錄本身還差 ${f(-ci.adj)}（漏記或入帳時間差）。對完可用「校正目前欠款」補齊`) : ''}
-    ${a.limit ? `<div class="sm tx2" style="padding-top:8px;border-top:1px solid var(--line)">額度 ${f(a.limit)}・可用 ${f(ci.avail)}${unbilledFee(a, ci.close) >= 1 ? `（未入帳分期利息 ${f(unbilledFee(a, ci.close))} 不扣額度）` : ''}</div>` : ''}
+    ${a.limit ? `<div class="sm tx2 tap" onclick="openAcctForm('${a.id}')" style="padding-top:8px;border-top:1px solid var(--line)">額度 ${f(a.limit)}・可用 ${f(ci.avail)}${unbilledFee(a, ci.close) >= 1 ? `（未入帳分期利息 ${f(unbilledFee(a, ci.close))} 不扣額度）` : ''}</div>` : ''}
     <div class="two" style="margin-top:12px"><button class="btn sec2" style="padding:10px" onclick="setStmt('${a.id}')">${ci.manual ? '修改帳單金額' : '以帳單為準'}</button><button class="btn sec2" style="padding:10px" onclick="openPlan(null,'${a.id}')">＋ 帳單分期</button></div>
     <button class="btn sec2" style="padding:10px;margin-top:8px" onclick="openHist('${a.id}')">歷史帳單（已繳紀錄）</button>
     <div class="hint" style="margin:10px 0 0">繳卡費：記一筆「轉帳」，從銀行帳戶轉入這張卡</div></div>`; }
@@ -1082,16 +1085,16 @@ function viewAcct(){
   }
   return `<div class="top"><button class="ib" onclick="go('accounts')">${ic('left',24)}</button><h1 style="flex:1;font-size:19px">${esc(a.name)}</h1>
       <button class="ib" onclick="openAcctForm('${a.id}')">${ic('edit',22)}</button></div>
-    ${ci ? '' : `<div class="card"><small class="tx2">${TYPES[a.type]?.[0] || ''} · ${a.currency}${a.archived ? ' · 已封存' : ''}</small>
+    ${ci ? '' : `<div class="card tap" onclick="openAcctForm('${a.id}')"><small class="tx2">${TYPES[a.type]?.[0] || ''} · ${a.currency}${a.archived ? ' · 已封存' : ''} · 校正餘額 ›</small>
       <div style="font-size:30px;font-weight:800;margin-top:4px" class="${b < 0 ? 'exp' : ''}">${fmt(b, a.currency)}</div>
       ${a.currency !== 'TWD' ? `<small class="tx2">≈ ${twd(b * rate(a.currency))}</small>` : ''}</div>`}
     ${info}
     ${a.type === 'credit' ? instSection(a, ci) : ''}
     <div class="rbar" style="margin-top:14px"><h3 style="margin:0 4px;font-size:15px">明細</h3><div class="nav2"><button onclick="amShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="openYM('am')">${ay} 年 ${amn + 1} 月 ▾</span><button onclick="amShift(1)">${ic('right',20)}</button></div></div>
     <div class="card" style="padding:12px 16px"><div class="sum3">
-      <div><small>流入</small><b class="inc" style="font-size:16px">${fmt(mIn, a.currency)}</b></div>
-      <div><small>流出</small><b class="exp" style="font-size:16px">${fmt(mOut, a.currency)}</b></div>
-      <div><small>${isCurM ? '目前餘額' : '月底餘額'}</small><b style="font-size:16px" class="${endBal < 0 ? 'exp' : ''}">${fmt(endBal, a.currency)}</b></div></div>
+      <div class="tap" onclick="openAcctRpt('${a.id}','${mf}','${mt}','income')"><small>流入 ›</small><b class="inc" style="font-size:16px">${fmt(mIn, a.currency)}</b></div>
+      <div class="tap" onclick="openAcctRpt('${a.id}','${mf}','${mt}','expense')"><small>流出 ›</small><b class="exp" style="font-size:16px">${fmt(mOut, a.currency)}</b></div>
+      <div class="tap" onclick="openAcctForm('${a.id}')"><small>${isCurM ? '目前餘額' : '月底餘額'} ›</small><b style="font-size:16px" class="${endBal < 0 ? 'exp' : ''}">${fmt(endBal, a.currency)}</b></div></div>
       <div class="sm tx2" style="margin-top:6px">${list.length} 筆${isCurM ? '' : ` · <button style="color:var(--acc)" onclick="const n=new Date();S.ui.am={y:n.getFullYear(),m:n.getMonth()};render()">回本月</button>`}</div></div>
     ${list.length || pcs.length ? Object.keys(byDay).sort().reverse().map(d => { const {t:ts, p:ps} = byDay[d], net = ts.reduce((x, t) => x + delta(t, a.id), 0);
       return `<div class="sec" style="margin:12px 20px 4px"><span class="sm b">${md(d)} ${wdName(d)}</span>${ts.length ? `<span class="sm ${net < 0 ? 'exp' : 'inc'}">${fmt(net, a.currency, true)}</span>` : ''}</div><div class="list">${ts.map(t => txnRow(t, a.id, false, true)).join('')}${ps.map(r => pieceRow(r, {forAcct:true, muted:true})).join('')}</div>`; }).join('')
@@ -1116,7 +1119,7 @@ function instSection(a, ci){
   const logBtn = all.length ? `<button class="sm" style="color:var(--acc);font-weight:600;margin-left:10px;white-space:nowrap" onclick="openInstLog('${a.id}')">記錄 ›</button>` : '';
   if (!ins.length && !pend.length) return all.length ? `<div class="sec" id="instSec"><h3>分期 <span class="sm tx2" style="font-weight:400">目前沒有進行中</span></h3>${logBtn}</div>` : '';
   const open = S.ui.instOpen === a.id, SHOW = 3, shown = open ? ins : ins.slice(0, SHOW), monthly = ins.filter(i => i.st.left).reduce((x, i) => x + i.st.per, 0);
-  return `<div class="sec" id="instSec"><h3>分期中 <span class="sm tx2" style="font-weight:400">${ins.length} 筆</span></h3>${ins.length ? `<span class="sm tx2">每月約 ${fmt(monthly, a.currency)} · 未繳 ${fmt(ins.reduce((x, i) => x + i.st.remain + i.st.curAmt, 0), a.currency)}</span>` : ''}${logBtn}</div>
+  return `<div class="sec" id="instSec"><h3>分期中 <span class="sm tx2" style="font-weight:400">${ins.length} 筆</span></h3>${ins.length ? `<span class="sm tx2 tap" onclick="openFuture('${a.id}')">每月約 ${fmt(monthly, a.currency)} · 未繳 ${fmt(ins.reduce((x, i) => x + i.st.remain + i.st.curAmt, 0), a.currency)}</span>` : ''}${logBtn}</div>
     <div class="list">${pend.map(x => `<button class="row" onclick="openPayoff('${x.t ? 'txn' : 'plan'}','${x.t ? x.t.id : x.pl.id}')"><span class="cic" style="background:#E8A33C">${ic('bell',20)}</span><span class="mid"><b>${esc(x.t ? (catOf(x.t.catId)?.name || '分期') : (x.pl.name || '帳單分期'))}・利息待確認</b><small>${md(x.po.date)} 提前結清，帳單出來後點這裡填利息／違約金</small></span>${ic('right',16)}</button>`).join('')}
     ${shown.map(({t, pl, st}) => { if (pl) return planRow(pl, st, a.currency);
       const c0 = S.data.categories[t.catId], m = catMain(c0);
@@ -1147,6 +1150,11 @@ function openRebate(aid, close){
 }
 /* ---------- 本期帳單明細 ---------- */
 let STM = null;
+function payStmt(aid, amt){   // v2.37：帳單直接記繳款（銀行 → 這張卡）
+  const A = S.data.accounts, ok = x => x && x.type !== 'credit' && !x.archived, last = Object.values(S.data.txns).filter(t => t.type === 'transfer' && t.toAccountId === aid && ok(A[t.accountId])).sort((x, y) => y.date.localeCompare(x.date))[0];
+  const from = last ? last.accountId : (accList().find(x => x.type === 'bank') || (ok(A[defaultAcc()]) ? A[defaultAcc()] : accList().find(ok)) || {}).id;
+  openAdd(null, {type:'transfer', accountId:from, toAccountId:aid, amtExpr:String(amt), date:today(), catId:FEE_CAT});
+}
 function openStmt(aid, close){ STM = {aid, close}; openLayer('stmt', renderStmt, 'full'); }
 function stmtShift(n){ const a = S.data.accounts[STM.aid]; STM.close = closeAdd(a, STM.close, n); redraw('stmt'); }
 function stmtData(a, close){
@@ -1185,7 +1193,7 @@ function renderStmt(){
   return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('stmt')">${ic('left',24)}</button><h2>${esc(a.name)} 帳單</h2><span style="width:40px"></span></div>
     <div class="rbar"><span class="sm tx2">${md(addD(d.prev, 1))} ～ ${md(close)}</span><div class="nav2"><button onclick="stmtShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="openYM('stmt')">${close.slice(0, 7).replace('-', '/')} 結帳 ▾</span><button onclick="stmtShift(1)" ${close > cc && close >= lastPieceClose(a) ? 'disabled style="opacity:.3"' : ''}>${ic('right',20)}</button></div></div>
     <div class="fscroll"><div class="card">
-      ${far ? '' : line(d.prevBank ? '上期帳單（銀行）' : '上期帳單', d.prevOwed, '')}
+      ${far ? '' : `<div class="tap" onclick="stmtShift(-1)">${line((d.prevBank ? '上期帳單（銀行）' : '上期帳單') + ' ›', d.prevOwed, '')}</div>`}
       ${far ? '' : line('本期繳款', d.sum('pay'), '−', 'inc')}${line('本期消費', d.sum('buy'), '＋', 'exp')}${line('本期分期', d.sum('inst'), '＋', 'exp')}
       ${far ? '' : `<div class="tap" onclick="openRebate('${a.id}','${close}')">${line('折抵（回饋・退款）✎', d.sum('refund'), '−', 'inc')}</div>`}${d.it.plan.length ? line('轉帳單分期', d.sum('plan'), '−', 'inc') : ''}
       <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>${future ? (close > closeAdd(a, cc, 1) ? '預估（目前已知的分期）' : '目前累計（尚未結帳）') : '本期應繳'}</span><b style="font-size:22px">${far ? f(d.sum('inst') + d.sum('buy') - d.sum('refund')) : d.total < 0 ? '溢繳 ' + f(-d.total) : f(d.total)}</b></div>
@@ -1193,7 +1201,8 @@ function renderStmt(){
         <div class="sm tx2">${d.prevBank ? '上期已填銀行帳單，上期帶入差＝0，這是本期自己的差（消費、分期、折抵）' : '上期沒填銀行帳單，差額可能含上期帶入；上期也填就能分開看'}</div>` : ''}
       ${!future ? `<button class="sm" style="display:block;margin:8px 0 0 auto;color:var(--acc);font-weight:600" onclick="setStmt('${a.id}','${close}')">${ov !== null ? '修改銀行帳單金額' : '以銀行帳單為準…'}</button>` : ''}
       ${!future ? `<div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:1px solid var(--line)"><span class="tx2">這期已繳／抵扣${pays.length ? `（${pays.map(t => md(t.date)).join('、')}）` : ''}</span><b class="inc">${f(paid)}</b></div>
-        <div style="display:flex;justify-content:space-between;padding-top:4px"><span class="tx2">${unp >= 1 ? (close === cc ? `未繳（${md(dueOf(a, close))} 截止）` : '未繳（併入下期）') : '狀態'}</span><b class="${unp >= 1 ? 'exp' : 'inc'}">${unp >= 1 ? f(unp) : '✓ 繳清'}</b></div>` : ''}</div>
+        <div style="display:flex;justify-content:space-between;padding-top:4px"><span class="tx2">${unp >= 1 ? (close === cc ? `未繳（${md(dueOf(a, close))} 截止）` : '未繳（併入下期）') : '狀態'}</span><b class="${unp >= 1 ? 'exp' : 'inc'}">${unp >= 1 ? f(unp) : '✓ 繳清'}</b></div>
+        ${unp >= 1 && close === cc ? `<button class="btn" style="margin-top:10px" onclick="payStmt('${a.id}',${Math.round(unp)})">記繳款 ${f(unp)}</button>` : ''}` : ''}</div>
       ${sec('inst', '本期分期', '')}${sec('buy', '本期消費', '')}${sec('refund', '退款・回饋', '−')}${sec('pay', '繳款', '−')}${sec('plan', '轉帳單分期', '−')}
       ${empty ? '<div class="empty">這期沒有紀錄</div>' : ''}
       <div class="hint">上期帳單 − 繳款 ＋ 消費 ＋ 分期 − 折抵 − 轉分期 ＝ 本期應繳。明細依銀行入帳日排序；金額不同時點進去修改那筆。</div><div style="height:30px"></div></div></div>`;
@@ -1259,19 +1268,20 @@ function renderDebt(aid){
   const futRows = fut.map(x => { const v = x.rest.reduce((s, p) => s + p.amt + p.fee, 0), k0 = x.rest[0].k + 1, k1 = x.rest[x.rest.length - 1].k + 1, last = x.rest[x.rest.length - 1].date;
     const title = x.pl ? (x.pl.name || '帳單分期') : (x.t.store ? x.t.store + '・' : '') + (catOf(x.t.catId)?.name || '分期');
     return `<button class="row" onclick="${x.pl ? `openPlan('${x.pl.id}')` : `openAdd('${x.t.id}')`}"><span class="mid"><b>${esc(title)}</b><small>${esc([`第 ${k0}${k1 > k0 ? '〜' + k1 : ''} 期（共 ${x.n} 期）`, x.t && x.t.note ? x.t.note.split('\n')[0] : ''].filter(Boolean).join(' · '))}</small></span><span class="amt">${f(v)}<small>到 ${last.slice(0, 7).replace('-', '/')}</small></span></button>`; }).join('');
-  const head = (title, v, note, cls = '') => `<div class="sec"><h3>${title}</h3><b class="${cls}">${f(v)}</b></div>${note ? `<div class="hint" style="margin:-2px 20px 6px">${note}</div>` : ''}`;
+  const head = (title, v, note, cls = '', click = '') => `<div class="sec ${click ? 'tap' : ''}" ${click ? `onclick="${click}"` : ''}><h3>${title}${click ? ' ›' : ''}</h3><b class="${cls}">${f(v)}</b></div>${note ? `<div class="hint" style="margin:-2px 20px 6px">${note}</div>` : ''}`;
   return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('debt')">${ic('left',24)}</button><h2>${esc(a.name)} 待繳明細</h2><span style="width:40px"></span></div>
     <div class="fscroll"><div class="card mt0"><small class="tx2">待繳總額</small><div style="font-size:28px;font-weight:800" class="exp">${f(ci.debt)}</div>
       <div class="sm tx2" style="margin-top:4px">本期未繳 ${f(ci.remain)} ＋ 下期待繳 ${f(ci.post)} ＋ 分期未入帳 ${f(ci.unbilled)}${Math.abs(ci.diff) >= 1 ? ` ＋ 差額 ${f(ci.diff)}` : ''}</div></div>
-    ${head(`本期未繳（${md(ci.close)} 帳單）`, ci.remain, `繳款截止 ${md(ci.due)}・帳單 ${f(ci.owed)}${ci.manual ? '（依銀行帳單）' : ''}・已繳 ${f(ci.paid)}`, ci.remain ? 'exp' : '')}
-    <div class="list">${cd.prevOwed >= 1 ? `<div class="row"><span class="mid"><b>上期帳單</b><small>${md(cd.prev)} 結帳</small></span><span class="amt">${f(cd.prevOwed)}</span></div>` : ''}
-      ${cd.it.pay.length ? `<div class="row"><span class="mid"><b>本期繳款</b><small>${cd.it.pay.length} 筆</small></span><span class="amt inc">−${f(cd.sum('pay'))}</span></div>` : ''}
+    ${head(`本期未繳（${md(ci.close)} 帳單）`, ci.remain, `繳款截止 ${md(ci.due)}・帳單 ${f(ci.owed)}${ci.manual ? '（依銀行帳單）' : ''}・已繳 ${f(ci.paid)}`, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`)}
+    ${ci.remain >= 1 ? `<div style="margin:0 16px 8px"><button class="btn sec2" style="padding:10px" onclick="payStmt('${a.id}',${Math.round(ci.remain)})">記繳款 ${f(ci.remain)}</button></div>` : ''}
+    <div class="list">${cd.prevOwed >= 1 ? `<button class="row" onclick="openStmt('${a.id}','${cd.prev}')"><span class="mid"><b>上期帳單</b><small>${md(cd.prev)} 結帳</small></span><span class="amt">${f(cd.prevOwed)}</span></button>` : ''}
+      ${cd.it.pay.length ? `<button class="row" onclick="openStmt('${a.id}','${ci.close}')"><span class="mid"><b>本期繳款</b><small>${cd.it.pay.length} 筆</small></span><span class="amt inc">−${f(cd.sum('pay'))}</span></button>` : ''}
       ${curRows || '<div class="empty">這期沒有消費</div>'}
       ${ci.paid ? `<div class="row"><span class="mid"><b>結帳後已繳</b></span><span class="amt inc">−${f(ci.paid)}</span></div>` : ''}</div>
     ${Math.abs(ci.diff) >= 1 ? `<div class="hint" style="margin:8px 20px 0">帳單與 App 推算差額 ${f(ci.diff)}：上面的明細是 App 依你的紀錄算的 ${f(ci.auto)}，銀行帳單是 ${f(ci.owed)}。逐筆跟銀行帳單對，找出不同的那筆。</div>` : ''}
-    ${head(`下期待繳（${md(ci.next)} 結帳）`, ci.post, [ci.off.p >= 1 ? `已抵扣 ${f(ci.off.p)}` : '', ci.miss >= 1 ? `含上期未結清 ${f(ci.miss)}` : ''].filter(Boolean).join('・'))}
+    ${head(`下期待繳（${md(ci.next)} 結帳）`, ci.post, [ci.off.p >= 1 ? `已抵扣 ${f(ci.off.p)}` : '', ci.miss >= 1 ? `含上期未結清 ${f(ci.miss)}` : ''].filter(Boolean).join('・'), '', `openStmt('${a.id}','${ci.next}')`)}
     <div class="list">${nextRows || '<div class="empty">還沒有新消費</div>'}</div>
-    ${head('分期未入帳', ci.unbilled, `${md(closeAdd(a, ci.next, 1))} 以後的分期`)}
+    ${head('分期未入帳', ci.unbilled, `${md(closeAdd(a, ci.next, 1))} 以後的分期`, '', `openFuture('${a.id}')`)}
     <div class="list">${futRows || '<div class="empty">沒有</div>'}</div>
     <div class="hint">每一筆都可以點開修改。過了結帳日會自動往後推一期。</div><div style="height:30px"></div></div></div>`;
 }
@@ -2002,9 +2012,9 @@ function viewOverview(){
     const spent = cur[day - 1] || 0, pSame = prev[Math.min(day, pn) - 1] || 0, est = isCur ? spent / day * n : spent, inc = summary(f0, t0).inc;
     main = `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>${ymS(cy, cm)} 累計支出</h3><span class="sm tx2">${isCur ? `到 ${day} 日` : '整月'}</span></div><div class="chart"><svg viewBox="-22 0 ${W + 22} ${H}">${svg}</svg></div>
       <div class="lg2">${leg('cur', '本月累計', 'var(--exp)')}${leg('prev', '上月同期', 'var(--tx2)', 1)}${bt ? leg('bud', '預算', '#E8A33C', 1) : ''}</div></div>
-      <div class="card"><div class="ovk"><div><small>${isCur ? '到今天花' : '整月支出'}</small><b class="exp">${twd(spent)}</b>${pSame ? cmpTxt(pct(spent, pSame), '比上月同期') : ''}</div>
-        <div><small>${isCur ? '月底預估' : '預算'}</small><b>${isCur ? twd(est) : bt ? twd(bt) : '—'}</b>${bt && isCur ? `<span class="${est > bt ? 'exp' : 'tx2'}">${est > bt ? '照這速度會超出預算' : '在預算內'}</span>` : ''}</div>
-        <div><small>本月收入</small><b class="inc">${twd(inc)}</b></div></div></div>
+      <div class="card"><div class="ovk"><div class="tap" onclick="goRp('cat','month',${cy},${cm},'expense')"><small>${isCur ? '到今天花' : '整月支出'} ›</small><b class="exp">${twd(spent)}</b>${pSame ? cmpTxt(pct(spent, pSame), '比上月同期') : ''}</div>
+        <div class="tap" onclick="${bt ? `goRp('budget','month',${cy},${cm})` : `goRp('cat','month',${cy},${cm},'expense')`}"><small>${isCur ? '月底預估' : '預算'} ›</small><b>${isCur ? twd(est) : bt ? twd(bt) : '—'}</b>${bt && isCur ? `<span class="${est > bt ? 'exp' : 'tx2'}">${est > bt ? '照這速度會超出預算' : '在預算內'}</span>` : ''}</div>
+        <div class="tap" onclick="goRp('cat','month',${cy},${cm},'income')"><small>本月收入 ›</small><b class="inc">${twd(inc)}</b></div></div></div>
       <div class="card">${bars(dCur.concat(Array(n - day).fill(0)).map((_, i) => `${cm + 1}/${i + 1}`), [{vals:dCur.concat(Array(n - day).fill(0)), color:'var(--exp)'}], 5)}<div class="sm tx2" style="margin-top:4px">每日支出・點下面日期看明細</div></div>
       <div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>日期</th><th>收入</th><th>支出</th></tr>${[...Array(day)].map((_, i) => day - i).map(d => { const x = ds(new Date(cy, cm, d)), sm = summary(x, x); return sm.inc || sm.exp ? `<tr onclick="S.ui.sel='${x}';go('home')" style="cursor:pointer"><td>${x.replace(/-/g, '/')}（${WD[pd(x).getDay()]}）</td><td class="inc">${sm.inc ? twd(sm.inc) : ''}</td><td class="exp">${sm.exp ? twd(sm.exp) : ''}</td></tr>` : ''; }).join('')}</table></div>`;
   } else {
@@ -2022,12 +2032,13 @@ function viewOverview(){
     const fst = (compute().list[0] || {}).date || td, ly0 = ds(new Date(cy - 1, cm, 1)), lyS = monthStat(cy - 1, cm, isCur ? sameDayCut(cy - 1, cm, td) : null);
     const yoy = ly0 < fst.slice(0, 8) + '01' ? '<span class="tx2 cmp">去年無資料</span>' : lyS.exp ? cmpTxt(pct(cur.exp, lyS.exp), '比去年同期') : '<span class="tx2 cmp">去年同期無支出</span>';
     if (CR) { const T = ms.reduce((o, x) => ({inc:o.inc + x.inc, exp:o.exp + x.exp}), {inc:0, exp:0}), net = T.inc - T.exp;
-      main += `<div class="card"><div class="ovk"><div><small>期間收入</small><b class="inc">${twd(T.inc)}</b></div><div><small>期間支出</small><b class="exp">${twd(T.exp)}</b><span class="tx2">月均 ${twd(T.exp / N)}</span></div>
-        <div><small>結餘・儲蓄率</small><b class="${net < 0 ? 'exp' : ''}">${twd(net)}</b><span style="color:${net >= 0 ? 'var(--acc)' : 'var(--exp)'}">${T.inc ? (net / T.inc * 100).toFixed(0) : 0}%${S.settings.srGoal ? `（目標 ${S.settings.srGoal}%）` : ''}</span></div></div></div>`; }
-    else main += `<div class="card"><div class="ovk"><div><small>${isCur ? '本月' : ymS(cy, cm)} 儲蓄率</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span>${S.settings.srGoal ? `<span style="color:${sr(cur) >= S.settings.srGoal ? 'var(--acc)' : 'var(--exp)'}">目標 ${S.settings.srGoal}%・${sr(cur) >= S.settings.srGoal ? '達成' : '未達'}</span>` : ''}</div>
-      <div><small>月均支出</small><b>${twd(avg)}</b><span class="tx2">前 ${done.length} 個月</span></div>
-      <div><small>支出比上月</small><b style="color:${cp > 0 ? 'var(--exp)' : 'var(--acc)'}">${prevS.exp ? (cp > 0 ? '+' : '−') + Math.abs(cp).toFixed(0) + '%' : '—'}</b><span class="tx2">${isCur ? '同期比較' : '整月比較'}</span>${yoy}</div></div></div>`;
-    main += `<div class="card" style="padding:12px 16px"><table class="tbl"><tr><th>月份</th><th>收入</th><th>支出</th><th>結餘</th><th>儲蓄率</th></tr>${ms.slice().reverse().map((x, i) => `<tr onclick="S.ui.rp={...S.ui.rp,y:${x.y},m:${x.m},ov:'m'};render()" style="cursor:pointer"><td>${ymS(x.y, x.m)}</td><td class="inc">${twd(x.inc)}</td><td class="exp">${twd(x.exp)}</td><td class="${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td><td style="color:${x.inc && S.settings.srGoal && x.net / x.inc * 100 >= S.settings.srGoal ? 'var(--acc)' : 'var(--tx2)'}">${x.inc ? (x.net / x.inc * 100).toFixed(0) + '%' : '—'}</td></tr>`).join('')}</table></div>`;
+      const rf = ds(new Date(ms[0].y, ms[0].m, 1)), rt = (x => ds(new Date(x.y, x.m, dim(x.y, x.m))))(ms[ms.length - 1]);
+      main += `<div class="card"><div class="ovk"><div class="tap" onclick="openRange('${rf}','${rt}','income')"><small>期間收入 ›</small><b class="inc">${twd(T.inc)}</b></div><div class="tap" onclick="openRange('${rf}','${rt}','expense')"><small>期間支出 ›</small><b class="exp">${twd(T.exp)}</b><span class="tx2">月均 ${twd(T.exp / N)}</span></div>
+        <div class="tap" onclick="document.getElementById('ovTbl')?.scrollIntoView({behavior:'smooth',block:'center'})"><small>結餘・儲蓄率 ›</small><b class="${net < 0 ? 'exp' : ''}">${twd(net)}</b><span style="color:${net >= 0 ? 'var(--acc)' : 'var(--exp)'}">${T.inc ? (net / T.inc * 100).toFixed(0) : 0}%${S.settings.srGoal ? `（目標 ${S.settings.srGoal}%）` : ''}</span></div></div></div>`; }
+    else main += `<div class="card"><div class="ovk"><div class="tap" onclick="CMP.per='month';CMP.base='prev';openCmp()"><small>${isCur ? '本月' : ymS(cy, cm)} 儲蓄率 ›</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span>${S.settings.srGoal ? `<span style="color:${sr(cur) >= S.settings.srGoal ? 'var(--acc)' : 'var(--exp)'}">目標 ${S.settings.srGoal}%・${sr(cur) >= S.settings.srGoal ? '達成' : '未達'}</span>` : ''}</div>
+      <div class="tap" onclick="document.getElementById('ovTbl')?.scrollIntoView({behavior:'smooth',block:'center'})"><small>月均支出 ›</small><b>${twd(avg)}</b><span class="tx2">前 ${done.length} 個月</span></div>
+      <div class="tap" onclick="CMP.per='month';CMP.base='prev';openCmp()"><small>支出比上月 ›</small><b style="color:${cp > 0 ? 'var(--exp)' : 'var(--acc)'}">${prevS.exp ? (cp > 0 ? '+' : '−') + Math.abs(cp).toFixed(0) + '%' : '—'}</b><span class="tx2">${isCur ? '同期比較' : '整月比較'}</span><span onclick="event.stopPropagation();CMP.per='month';CMP.base='yoy';openCmp()">${yoy}</span></div></div></div>`;
+    main += `<div class="card" id="ovTbl" style="padding:12px 16px"><table class="tbl"><tr><th>月份</th><th>收入</th><th>支出</th><th>結餘</th><th>儲蓄率</th></tr>${ms.slice().reverse().map((x, i) => `<tr onclick="S.ui.rp={...S.ui.rp,y:${x.y},m:${x.m},ov:'m'};render()" style="cursor:pointer"><td>${ymS(x.y, x.m)}</td><td class="inc">${twd(x.inc)}</td><td class="exp">${twd(x.exp)}</td><td class="${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td><td style="color:${x.inc && S.settings.srGoal && x.net / x.inc * 100 >= S.settings.srGoal ? 'var(--acc)' : 'var(--tx2)'}">${x.inc ? (x.net / x.inc * 100).toFixed(0) + '%' : '—'}</td></tr>`).join('')}</table></div>`;
   }
   // 這個月變多的分類（比近 3 個月同期平均）；自訂區間：比前一段同長度
   let F0 = f0, T0 = t0, CUT = cut;
@@ -2335,6 +2346,77 @@ function saveGoal(){
   putSettings({goals:gs}); closeLayer('goal'); toast('已儲存');
 }
 function delGoal(){ if (!confirm('刪除這個目標？')) return; putSettings({goals:(S.settings.goals || []).filter(x => x.id !== GF.id)}); closeLayer('goal'); }
+
+/* ===== v2.37 待購清單（只做試算：一次付看可動用、分期看每期／利息並疊到分期壓力） ===== */
+let WF = null, WOFF = new Set(), WSEL = null;
+const wishList = () => S.settings.wish || [];
+function wishPlan(w){   // 每期金額、利息、各期 [月份索引(相對本月), 金額]
+  const P = +w.amt || 0, n = w.n > 1 ? +w.n : 1, apr = +w.apr || 0, now = new Date(), k0 = now.getFullYear() * 12 + now.getMonth();
+  const [y, m] = (w.ym || '').split('-').map(Number), start = (y ? y * 12 + m - 1 : k0) - k0;
+  if (n === 1) return {n, per:P, first:P, fee:0, total:P, pcs:[[start + (w.aid ? 1 : 0), P]]};
+  let per, first;
+  if (apr > 0) { per = aprPer(P, n, apr); first = per; }
+  else { per = Math.floor(P / n); first = P - per * (n - 1); }
+  const total = first + per * (n - 1);
+  return {n, per, first, fee:total - P, total, pcs:[...Array(n)].map((_, i) => [start + 1 + i, i ? per : first])};
+}
+function wishEntry(){
+  const ws = wishList(), tot = ws.reduce((x, w) => x + (+w.amt || 0), 0);
+  return `<button class="card" style="width:calc(100% - 32px);display:flex;align-items:center;gap:10px;text-align:left" onclick="openWish()">${ic('cart',20)}<span style="flex:1"><b>待購清單</b><br><small class="tx2">${ws.length ? `${ws.length} 項・合計 ${twd(tot)}・點進去試算` : '想買的東西先放這裡，試算一次付或分期的影響'}</small></span>${ic('right',18)}</button>`;
+}
+function openWish(){ WSEL = null; openLayer('wish', renderWish, 'full'); }
+function wishTog(id){ WOFF.has(id) ? WOFF.delete(id) : WOFF.add(id); redraw('wish'); }
+function wishPick(i){ WSEL = WSEL === i ? null : i; redraw('wish'); }
+function renderWish(){
+  const ws = wishList(), on = ws.filter(w => !WOFF.has(w.id)), plans = Object.fromEntries(ws.map(w => [w.id, wishPlan(w)]));
+  const once = on.filter(w => !(w.n > 1)), inst = on.filter(w => w.n > 1), onceT = once.reduce((x, w) => x + (+w.amt || 0), 0);
+  const {ms, sum} = pressureData(''), add = ms.map(() => 0);
+  for (const w of inst) for (const [i, v] of plans[w.id].pcs) if (i >= 0 && i < 12) add[i] += v;
+  const after = sum.map((v, i) => v + add[i]), mxI = add.reduce((b, v, i) => v > add[b] ? i : b, 0), fi = Math.max(0, add.findIndex(v => v > 0)), av = availNow().avail;
+  const tot = on.reduce((x, w) => x + plans[w.id].total, 0), fee = on.reduce((x, w) => x + plans[w.id].fee, 0);
+  const sel = WSEL !== null ? `<div class="selbox"><b>${ms[WSEL][0]}/${ms[WSEL][1] + 1}</b><span>現有分期 ${twd(sum[WSEL])}</span><span class="exp">待購 ${twd(add[WSEL])}</span><span>合計 ${twd(after[WSEL])}</span></div>` : '';
+  const row = w => { const p = plans[w.id], c = w.aid ? S.data.accounts[w.aid] : null, off = WOFF.has(w.id);
+    return `<div class="row" style="${off ? 'opacity:.45' : ''}"><input type="checkbox" ${off ? '' : 'checked'} onchange="wishTog('${w.id}')" style="width:22px;height:22px;accent-color:var(--acc)">
+      <button class="mid" style="text-align:left" onclick="openWishForm('${w.id}')"><b>${esc(w.name)}</b><small>${[w.ym ? w.ym.replace('-', '/') + ' 想買' : '', p.n > 1 ? `${p.n} 期・每期 ${twd(p.per)}${p.first !== p.per ? `（首期 ${twd(p.first)}）` : ''}${p.fee ? `・利息 ${twd(p.fee)}` : '・0 利率'}` : '一次付', c ? c.name : ''].filter(Boolean).join('・')}</small></button>
+      <span class="amt">${twd(+w.amt || 0)}</span></div>`; };
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('wish')">${ic('left',24)}</button><h2>待購清單</h2><button class="ib" onclick="openWishForm()">${ic('plus',24)}</button></div>
+    <div class="fscroll">${ws.length ? `<div class="card mt0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px"><span class="tx2">勾選合計${fee ? `<br><small>含利息 ${twd(fee)}</small>` : ''}</span><b style="font-size:20px">${twd(tot)}</b></div>
+      <div class="tap" onclick="closeLayer('wish',true);go('accounts')" style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px;border-top:1px solid var(--line)"><span class="tx2">一次付後可動用 ›<br><small>現在 ${twd(av)}${onceT ? `・一次付 ${twd(onceT)}` : ''}</small></span><b style="font-size:20px" class="${av - onceT < 0 ? 'exp' : ''}">${twd(av - onceT)}</b></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px 2px;border-top:1px solid var(--line)"><span class="tx2">每月多出分期<br><small>${add[mxI] ? `${ms[fi][0]}/${ms[fi][1] + 1} 起${add[mxI] !== add[fi] ? `・最多 ${ms[mxI][1] + 1} 月` : ''}` : '沒有分期'}</small></span><b style="font-size:20px" class="${add[mxI] ? 'exp' : ''}">${twd(add[mxI])}</b></div></div>
+      ${inst.length ? `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>分期壓力試算</h3><span class="sm tx2">未來 12 個月・點月份看數字</span></div>
+        ${multiLine(ms.map(([, m]) => (m + 1) + '月'), [{k:'a', vals:after, color:'var(--exp)'}, {k:'b', vals:sum, color:'var(--tx2)', dash:1}], WSEL, 'wishPick')}
+        <div class="lg2"><button><i style="background:var(--exp)"></i>加上待購</button><button><i style="background:var(--tx2)"></i>現有分期</button></div>${sel}</div>` : ''}
+      <div class="sec"><h3>清單</h3><span class="sm tx2">勾選的才算進試算</span></div><div class="list">${ws.map(row).join('')}</div>
+      <div class="hint">只是試算，不會記帳。買了或不買了，點進去刪掉就好。一次付用信用卡的，錢在下個月繳卡費時才扣。</div>`
+    : `<div class="empty" style="padding:40px 20px">還沒有待購項目<br><button class="btn" style="margin-top:14px" onclick="openWishForm()">＋ 新增</button></div>`}<div style="height:30px"></div></div></div>`;
+}
+function openWishForm(id){
+  const w = id ? wishList().find(x => x.id === id) : null;
+  WF = w ? {...w, amt:String(w.amt), n:String(w.n || 1), apr:w.apr ? String(w.apr) : ''} : {id:null, name:'', amt:'', ym:'', n:'1', aid:'', apr:''};
+  openLayer('wishf', renderWishForm, 'btm');
+}
+function renderWishForm(){
+  const f = WF, inst = +f.n > 1, cards = accList().filter(a => a.type === 'credit'), p = +f.amt > 0 ? wishPlan({...f, amt:+f.amt, n:+f.n || 1, apr:+f.apr || 0}) : null;
+  const body = `<div class="fld"><label>品名</label><input value="${esc(f.name)}" placeholder="例：新手機" oninput="WF.name=this.value"></div>
+    <div class="two"><div class="fld"><label>預估金額</label><input inputmode="decimal" value="${esc(f.amt)}" placeholder="例：30000" oninput="WF.amt=this.value" onchange="redraw('wishf')"></div>
+      <div class="fld"><label>想買月份（可空）</label><input type="month" value="${f.ym}" onchange="WF.ym=this.value;redraw('wishf')"></div></div>
+    <div class="fld"><label>付法</label><div class="seg" style="display:flex"><button style="flex:1" class="${!inst ? 'on' : ''}" onclick="WF.n='1';redraw('wishf')">一次付</button><button style="flex:1" class="${inst ? 'on' : ''}" onclick="WF.n=WF.n>1?WF.n:'12';redraw('wishf')">分期</button></div></div>
+    ${inst ? `<div class="two"><div class="fld"><label>期數</label><select onchange="WF.n=this.value;redraw('wishf')">${[3,6,10,12,18,24,30,36].map(n => `<option ${+f.n === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="fld"><label>年利率 %（可空）</label><input inputmode="decimal" value="${esc(f.apr)}" placeholder="0" oninput="WF.apr=this.value" onchange="redraw('wishf')"></div></div>` : ''}
+    <div class="fld"><label>${inst ? '哪張卡' : '用信用卡付（可空）'}</label><select onchange="WF.aid=this.value;redraw('wishf')"><option value="">${inst ? '未定' : '不用卡（現金／轉帳）'}</option>${cards.map(a => `<option value="${a.id}" ${a.id === f.aid ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
+    ${p ? `<div class="hint" style="margin:0 0 12px">${p.n > 1 ? `每期 <b>${twd(p.per)}</b>${p.first !== p.per ? `（首期 ${twd(p.first)}）` : ''}・共 ${twd(p.total)}・利息 ${twd(p.fee)}` : `一次付 ${twd(p.total)}`}</div>` : ''}
+    <button class="btn" onclick="saveWish()">儲存</button>${f.id ? '<button class="btn del" style="margin-top:6px" onclick="delWish()">刪除</button>' : ''}`;
+  return sheet('wishf', f.id ? '編輯待購' : '新增待購', body);
+}
+function saveWish(){
+  const f = WF, amt = parseFloat(String(f.amt).replace(/,/g, '')), n = +f.n > 1 ? +f.n : 1;
+  if (!f.name.trim()) return toast('請輸入品名'); if (!(amt > 0)) return toast('請輸入金額');
+  const w = {id:f.id || 'w_' + uid(), name:f.name.trim(), amt, ym:f.ym || '', n, aid:f.aid || '', apr:n > 1 ? (parseFloat(f.apr) || 0) : 0};
+  const ws = wishList().filter(x => x.id !== w.id); f.id ? ws.splice(wishList().findIndex(x => x.id === w.id), 0, w) : ws.push(w);
+  putSettings({wish:ws}); closeLayer('wishf'); redraw('wish');
+}
+function delWish(){ if (!confirm('刪除這項？')) return; putSettings({wish:wishList().filter(x => x.id !== WF.id)}); WOFF.delete(WF.id); closeLayer('wishf'); redraw('wish'); }
 /* ===== 固定支出分類 ===== */
 function openFixed(){ openLayer('fixed', renderFixed, 'btm'); }
 function renderFixed(){
@@ -2484,9 +2566,9 @@ function viewReports(){
       return {m, as, li, net:as - li};
     });
     const lastR = rows[rows.length - 1];
-    body = `${monthNav()}<div class="card"><small class="tx2">${isCurA ? '目前淨資產' : `${r.y}/${r.m + 1} 月底淨資產`}</small><div style="font-size:26px;font-weight:800" class="${lastR.net < 0 ? 'exp' : ''}">${twd(isCurA ? (() => { const n = netWorth(); return n.net ?? (n.as - n.li); })() : lastR.net)}</div>
+    body = `${monthNav()}<div class="card tap" onclick="go('accounts')"><small class="tx2">${isCurA ? '目前淨資產' : `${r.y}/${r.m + 1} 月底淨資產`} ›</small><div style="font-size:26px;font-weight:800" class="${lastR.net < 0 ? 'exp' : ''}">${twd(isCurA ? (() => { const n = netWorth(); return n.net ?? (n.as - n.li); })() : lastR.net)}</div>
       <div class="sm tx2" style="margin:2px 0 4px">到 ${r.y}/${r.m + 1} 的 12 個月（月底）</div>${lineChart(rows.map(x => x.m + 1), rows.map(x => x.net), 'var(--acc)')}</div>
-      ${goalSection()}${pressureCard()}${instLogLink()}
+      ${goalSection()}${wishEntry()}${pressureCard()}${instLogLink()}
       <div class="sec"><h3>每月資產</h3></div><div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>月份</th><th>資產</th><th>負債</th><th>淨資產</th></tr>
       ${rows.slice().reverse().map(x => `<tr><td>${x.m + 1} 月</td><td class="inc">${twd(x.as)}</td><td class="exp">${twd(x.li)}</td><td class="b ${x.net < 0 ? 'exp' : ''}">${twd(x.net)}</td></tr>`).join('')}</table></div>
       <div class="hint">外幣以目前匯率換算</div>`;
@@ -3053,9 +3135,9 @@ function viewSettings(){
         <input type="color" value="${cu.acc || '#2A8378'}" oninput="colorPrev('acc',this.value)" onchange="colorSave('acc',this.value)" onblur="colorDone()" style="width:40px;height:34px;border:0;background:none">
         ${th === 'custom' ? '<b style="color:var(--pri);font-size:12px">使用中</b>' : ''}</span></div>
       <div class="tog"><span>深淺色</span><div class="seg">${[['time','依時間'],['auto','跟系統'],['light','淺'],['dark','深']].map(([k, l]) => `<button class="${P.mode === k ? 'on' : ''}" onclick="P.mode='${k}';savePrefs();applyTheme();render()">${l}</button>`).join('')}</div></div>
-      ${P.mode === 'time' ? `<div class="tog" style="flex-wrap:wrap;gap:8px"><span>深色時段</span><span style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
-        <input type="time" value="${P.darkFrom}" onclick="try{this.showPicker()}catch(e){}" oninput="if(this.value){P.darkFrom=this.value;savePrefs()}" onchange="P.darkFrom=this.value||'22:00';savePrefs();applyTheme();render()" style="width:136px;font-size:15px;text-align:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)">～
-        <input type="time" value="${P.darkTo}" onclick="try{this.showPicker()}catch(e){}" oninput="if(this.value){P.darkTo=this.value;savePrefs()}" onchange="P.darkTo=this.value||'08:00';savePrefs();applyTheme();render()" style="width:136px;font-size:15px;text-align:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)"></span></div>` : ''}</div>
+      ${P.mode === 'time' ? `<div class="tog" style="flex-wrap:wrap;gap:8px"><span>深色時段</span><span style="display:flex;gap:6px;align-items:center;flex:1 1 100%;justify-content:flex-start">
+        <input type="time" value="${P.darkFrom}" onclick="try{this.showPicker()}catch(e){}" oninput="if(this.value){P.darkFrom=this.value;savePrefs()}" onchange="P.darkFrom=this.value||'22:00';savePrefs();applyTheme();render()" style="flex:1;min-width:0;max-width:170px;font-size:15px;text-align:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)">～
+        <input type="time" value="${P.darkTo}" onclick="try{this.showPicker()}catch(e){}" oninput="if(this.value){P.darkTo=this.value;savePrefs()}" onchange="P.darkTo=this.value||'08:00';savePrefs();applyTheme();render()" style="flex:1;min-width:0;max-width:170px;font-size:15px;text-align:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)"></span></div>` : ''}</div>
     <div class="grp"><span>使用習慣</span></div>
     <div class="list set"><div class="row"><span class="mid"><b>離開後回到首頁今天</b><small>正在記帳且已輸入的內容會保留</small></span><select onchange="P.dockAfter=+this.value;savePrefs()" style="border:1px solid var(--line);border-radius:10px;padding:6px;background:var(--bg)">${[[0,'立即'],[30,'30 秒後'],[60,'1 分鐘後'],[300,'5 分鐘後'],[999999,'不要']].map(([v, l]) => `<option value="${v}" ${(+P.dockAfter || 0) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div></div>
     <div class="grp"><span>安全</span></div>
