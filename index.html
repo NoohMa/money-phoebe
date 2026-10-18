@@ -332,7 +332,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.37';
+const VERSION = 'v2.38';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -845,7 +845,9 @@ function render(){
   const cols = ['reports', 'accounts', 'settings', 'acct'].includes(S.ui.tab);
   $('#app').className = cols ? 'cols' : '';
   $('#app').innerHTML = cols ? `<div class="colw">${v()}</div>` : v();
-  renderNav();
+  renderNav(); NAVCUR = navSnap();
+  if (NAVSTK.length && S.ui.tab !== 'acct') { const t = $('#app .top'); if (t && t.firstElementChild) { const h = t.firstElementChild, w = document.createElement('div');
+    w.style.cssText = 'display:flex;align-items:center;gap:2px;min-width:0'; w.innerHTML = `<button class="ib" onclick="goBack()" aria-label="返回">${ic('left',24)}</button>`; t.insertBefore(w, h); w.appendChild(h); } }
   if (S.ui.tab === 'carrier') drawBarcode();
   if (S.ui.tab === 'accounts' && S.ui.sorting) mountSort();
   if (S.ui.tab === 'home') mountSwipe();
@@ -853,13 +855,21 @@ function render(){
 function renderNav(){
   const t = S.ui.tab, on = k => (t === k || (k === 'accounts' && t === 'acct')) ? 'on' : '';
   $('#nav').innerHTML = `<div class="in">
-    <button class="${on('home')}" onclick="go('home')">${ic('homeNav',24)}首頁</button>
-    <button class="${on('reports')}" onclick="go('reports')">${ic('pie',24)}報表</button>
+    <button class="${on('home')}" onclick="navTab('home')">${ic('homeNav',24)}首頁</button>
+    <button class="${on('reports')}" onclick="navTab('reports')">${ic('pie',24)}報表</button>
     <button onclick="openAdd()"><span class="fab">${ic('plus',28,2.4)}</span></button>
-    <button class="${on('accounts')}" onclick="go('accounts')">${ic('wallet',24)}帳戶</button>
-    <button class="${on('settings')}" onclick="go('settings')">${ic('gear',24)}設定</button></div>`;
+    <button class="${on('accounts')}" onclick="navTab('accounts')">${ic('wallet',24)}帳戶</button>
+    <button class="${on('settings')}" onclick="navTab('settings')">${ic('gear',24)}設定</button></div>`;
 }
-function go(tab){ if (tab === 'carrier' && !FEAT.carrier) tab = 'home'; if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
+/* v2.38：點連結跳頁會記住來源（NAVSTK），返回鍵／右滑／Android 返回／Esc 回到來源；底部選單切頁清空 */
+let NAVSTK = [], NAVCUR = null;
+const navSnap = () => ({tab:S.ui.tab, acct:S.ui.acct, am:S.ui.am ? {...S.ui.am} : null, rp:{...S.ui.rp}, sel:S.ui.sel, y:scrollY});
+function navPush(tab){
+  const c = NAVCUR; if (!c || !S.ready) return;
+  if (c.tab !== tab || (tab === 'reports' && c.rp.seg !== S.ui.rp.seg) || (tab === 'home' && c.sel !== S.ui.sel) || (tab === 'acct' && c.acct !== S.ui.acct)) { NAVSTK.push({...c, y:scrollY}); if (NAVSTK.length > 20) NAVSTK.shift(); }
+}
+function navTab(tab){ NAVSTK = []; go(tab, true); }
+function go(tab, noPush){ if (tab === 'carrier' && !FEAT.carrier) tab = 'home'; if (!noPush) navPush(tab); if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
 
 /* ---------- home ---------- */
 function catOf(id){ return S.data.categories[id]; }
@@ -1049,7 +1059,7 @@ function mountSort(){
     [...el.children].forEach((row, i) => { const a = S.data.accounts[row.dataset.id]; if (a && a.order !== i) { a.order = i; put('accounts', a, true); } });
   }}));
 }
-function openAcct(id){ if (S.ui.sorting) return; const n = new Date(); S.ui.am = {y:n.getFullYear(), m:n.getMonth()}; S.ui.acct = id; S.ui.tab = 'acct'; render(); scrollTo(0, 0); }
+function openAcct(id){ if (S.ui.sorting) return; const n = new Date(); S.ui.am = {y:n.getFullYear(), m:n.getMonth()}; S.ui.acct = id; navPush('acct'); S.ui.tab = 'acct'; render(); scrollTo(0, 0); }
 function viewAcct(){
   const a = S.data.accounts[S.ui.acct]; if (!a) { S.ui.tab = 'accounts'; return viewAccounts(); }
   const c = compute(), b = c.bal[a.id] || 0, ci = cardInfo(a);
@@ -1083,7 +1093,7 @@ function viewAcct(){
       <div><small>現在匯率</small><b>${cr.toFixed(4)}</b></div><div><small>平均成本匯率</small><b>${av.toFixed(4)}</b></div>
       <div><small>現值</small><b>${twd(b * cr)}</b></div><div><small>匯差</small><b class="${gain < 0 ? 'exp' : 'inc'}">${twd(gain, true)}</b></div></div></div>`;
   }
-  return `<div class="top"><button class="ib" onclick="go('accounts')">${ic('left',24)}</button><h1 style="flex:1;font-size:19px">${esc(a.name)}</h1>
+  return `<div class="top"><button class="ib" onclick="goBack()">${ic('left',24)}</button><h1 style="flex:1;font-size:19px">${esc(a.name)}</h1>
       <button class="ib" onclick="openAcctForm('${a.id}')">${ic('edit',22)}</button></div>
     ${ci ? '' : `<div class="card tap" onclick="openAcctForm('${a.id}')"><small class="tx2">${TYPES[a.type]?.[0] || ''} · ${a.currency}${a.archived ? ' · 已封存' : ''} · 校正餘額 ›</small>
       <div style="font-size:30px;font-weight:800;margin-top:4px" class="${b < 0 ? 'exp' : ''}">${fmt(b, a.currency)}</div>
@@ -1537,7 +1547,7 @@ function projOpts(){
   return `<option value="">無專案</option>${ps.map(p => `<option value="${p.id}" ${p.id === F.projectId ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}<option value="__new">＋ 新增專案</option>`;
 }
 const FREQ = {week:'每週', month:'每月', year:'每年'};
-const INST_OPTS = [3, 6, 9, 10, 12, 18, 24, 30, 36];
+const INST_OPTS = [3, 6, 9, 12, 18, 24, 30, 36, 48];
 function tplList(){ return Object.values(S.data.templates || {}).sort(byOrder); }
 function renderAdd(){
   const t = F.type, A = S.data.accounts, c = compute(), rule = F.mode === 'rule', isNew = !F.id && !rule;
@@ -1636,6 +1646,7 @@ document.addEventListener('click', e => { if (!DESK) return; const el = e.target
   if (el && el.tagName === 'INPUT' && /^(date|month|time)$/.test(el.type) && el.showPicker) { try { el.showPicker(); } catch (er) {} } });
 /* v2.21 電腦版：記帳畫面鍵盤輸入金額 */
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !(LAYERS.length && LAYERS[LAYERS.length - 1].key === 'add')) { const tg = e.target; if (tg && /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) { tg.blur(); return; } if (canGoBack()) { e.preventDefault(); goBack(); } return; }
   const L = LAYERS[LAYERS.length - 1]; if (!L || L.key !== 'add' || !F) return;
   if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
   const k = e.key, tg = e.target; if (tg && (/^(TEXTAREA|SELECT)$/.test(tg.tagName) || tg.isContentEditable || (tg.tagName === 'INPUT' && !tg.classList.contains('ov') && !/^(checkbox|radio|button)$/.test(tg.type)))) return;
@@ -2391,6 +2402,7 @@ function renderWish(){
       <div class="hint">只是試算，不會記帳。買了或不買了，點進去刪掉就好。一次付用信用卡的，錢在下個月繳卡費時才扣。</div>`
     : `<div class="empty" style="padding:40px 20px">還沒有待購項目<br><button class="btn" style="margin-top:14px" onclick="openWishForm()">＋ 新增</button></div>`}<div style="height:30px"></div></div></div>`;
 }
+function wishN(v){ if (v === 'custom') { const n = parseInt(prompt('分期期數（2–120）', WF.n > 1 ? WF.n : '')); if (n >= 2 && n <= 120) WF.n = String(n); } else WF.n = v; redraw('wishf'); }
 function openWishForm(id){
   const w = id ? wishList().find(x => x.id === id) : null;
   WF = w ? {...w, amt:String(w.amt), n:String(w.n || 1), apr:w.apr ? String(w.apr) : ''} : {id:null, name:'', amt:'', ym:'', n:'1', aid:'', apr:''};
@@ -2402,7 +2414,7 @@ function renderWishForm(){
     <div class="two"><div class="fld"><label>預估金額</label><input inputmode="decimal" value="${esc(f.amt)}" placeholder="例：30000" oninput="WF.amt=this.value" onchange="redraw('wishf')"></div>
       <div class="fld"><label>想買月份（可空）</label><input type="month" value="${f.ym}" onchange="WF.ym=this.value;redraw('wishf')"></div></div>
     <div class="fld"><label>付法</label><div class="seg" style="display:flex"><button style="flex:1" class="${!inst ? 'on' : ''}" onclick="WF.n='1';redraw('wishf')">一次付</button><button style="flex:1" class="${inst ? 'on' : ''}" onclick="WF.n=WF.n>1?WF.n:'12';redraw('wishf')">分期</button></div></div>
-    ${inst ? `<div class="two"><div class="fld"><label>期數</label><select onchange="WF.n=this.value;redraw('wishf')">${[3,6,10,12,18,24,30,36].map(n => `<option ${+f.n === n ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+    ${inst ? `<div class="two"><div class="fld"><label>期數</label><select onchange="wishN(this.value)">${[...new Set([...INST_OPTS, +f.n])].sort((x, y) => x - y).map(n => `<option value="${n}" ${+f.n === n ? 'selected' : ''}>${n} 期</option>`).join('')}<option value="custom">自訂期數…</option></select></div>
       <div class="fld"><label>年利率 %（可空）</label><input inputmode="decimal" value="${esc(f.apr)}" placeholder="0" oninput="WF.apr=this.value" onchange="redraw('wishf')"></div></div>` : ''}
     <div class="fld"><label>${inst ? '哪張卡' : '用信用卡付（可空）'}</label><select onchange="WF.aid=this.value;redraw('wishf')"><option value="">${inst ? '未定' : '不用卡（現金／轉帳）'}</option>${cards.map(a => `<option value="${a.id}" ${a.id === f.aid ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}</select></div>
     ${p ? `<div class="hint" style="margin:0 0 12px">${p.n > 1 ? `每期 <b>${twd(p.per)}</b>${p.first !== p.per ? `（首期 ${twd(p.first)}）` : ''}・共 ${twd(p.total)}・利息 ${twd(p.fee)}` : `一次付 ${twd(p.total)}`}</div>` : ''}
@@ -3393,7 +3405,7 @@ function boot(){
   refreshRates();
 }
 /* 返回：Android 返回鍵／手勢、瀏覽器上一頁、iPhone 主畫面 App 從左邊緣右滑 */
-function canGoBack(){ return !LOCKED && (LAYERS.length > 0 || S.ui.tab !== 'home'); }
+function canGoBack(){ return !LOCKED && (LAYERS.length > 0 || NAVSTK.length > 0 || S.ui.tab !== 'home'); }
 function goBack(){
   if (LOCKED) return false;
   if (LAYERS.length) {
@@ -3402,8 +3414,9 @@ function goBack(){
     if (top.key === 'cm' && CM.adding) { CM.adding = null; redraw('cm'); return true; }
     closeLayer(top.key); return true;
   }
-  if (S.ui.tab === 'acct') { go('accounts'); return true; }
-  if (S.ui.tab !== 'home') { go('home'); return true; }
+  if (NAVSTK.length) { const b = NAVSTK.pop(); Object.assign(S.ui, {tab:b.tab, acct:b.acct, am:b.am || S.ui.am, rp:b.rp, sel:b.sel, sorting:false}); render(); scrollTo(0, b.y || 0); return true; }
+  if (S.ui.tab === 'acct') { go('accounts', true); return true; }
+  if (S.ui.tab !== 'home') { go('home', true); return true; }
   return false;
 }
 try { history.replaceState({base:1}, ''); history.pushState({guard:1}, ''); } catch(e) {}
@@ -3415,7 +3428,7 @@ addEventListener('popstate', () => {
 (function(){
   if (navigator.standalone !== true) return;   // 只有 iPhone 主畫面 App 需要自己做手勢；瀏覽器與 Android 用系統返回
   let x0 = null, y0 = 0, ind = null;
-  addEventListener('touchstart', e => { const t = e.touches[0]; if (t.clientX > 22 || !canGoBack()) return; x0 = t.clientX; y0 = t.clientY;
+  addEventListener('touchstart', e => { const t = e.touches[0]; if (t.clientX > 30 || !canGoBack()) return; x0 = t.clientX; y0 = t.clientY;
     ind = document.createElement('div'); ind.id = 'swipeback'; ind.innerHTML = ic('left', 22); document.body.appendChild(ind); }, {passive:true});
   addEventListener('touchmove', e => { if (x0 === null) return; const t = e.touches[0], dx = Math.max(0, t.clientX - x0);
     ind.style.transform = `translate(${Math.min(dx, 90) - 44}px, ${t.clientY - 22}px) scale(${Math.min(1, .5 + dx / 160)})`; ind.style.opacity = Math.min(1, dx / 70); }, {passive:true});
@@ -3435,7 +3448,7 @@ function backToDock(){
   for (const L of [...LAYERS]) if (!(keepAdd && L.key === 'add')) closeLayer(L.key, true);
   const n = new Date();
   S.ui.sel = today(); S.ui.sorting = false; S.ui.rp = {...S.ui.rp, per:'month', y:n.getFullYear(), m:n.getMonth()};
-  S.ui.tab = LAUNCH_CARRIER ? 'carrier' : 'home';
+  S.ui.tab = LAUNCH_CARRIER ? 'carrier' : 'home'; NAVSTK = [];
   history.replaceState(null, '', location.pathname + location.search + (LAUNCH_CARRIER ? '#carrier' : ''));
   render(); scrollTo(0, 0);
 }
