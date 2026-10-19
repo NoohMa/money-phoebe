@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Money">
-<meta name="theme-color" content="#FAF8F7">
+<meta name="theme-color" content="#FFF8FB">
 <title>Money</title>
 <link rel="apple-touch-icon" id="touchIcon">
 <link rel="icon" id="favIcon">
@@ -186,10 +186,6 @@ textarea.note{display:block;width:calc(100% - 32px);margin:0 16px 8px;border:0;b
 .thm button.on{border-color:var(--pri)}
 .thm .dots{display:flex;justify-content:center;gap:4px;margin-bottom:6px}
 .thm .dots i{width:16px;height:16px;border-radius:50%}
-/* carrier */
-.bc{background:#fff;border-radius:20px;margin:16px;padding:22px 10px;text-align:center;box-shadow:var(--sh)}
-.bc svg{width:100%;height:auto;max-height:150px}
-.bc .code{color:#111;font-size:28px;font-weight:800;letter-spacing:4px;margin-top:8px;font-family:ui-monospace,Menlo,monospace}
 .hint{margin:6px 22px;font-size:13px;color:var(--tx2);line-height:1.6}
 /* cat manager */
 .cm-main{background:var(--bg);border-radius:16px;padding:10px;margin-bottom:10px}
@@ -286,11 +282,32 @@ body{zoom:var(--z)}
 .login{max-width:380px;margin:0 auto;padding:calc(70px + env(safe-area-inset-top)) 24px 40px}
 .login h1{font-size:34px;color:var(--pri);margin:0 0 6px;letter-spacing:2px}
 .ghost-sortable{opacity:.4}
+
+/* Money V3: 櫻花粉主色、湖水綠輔色、單色按鈕 */
+:root{--pri:#F58EB3;--acc:#57C9C7;--pri-s:#FFE7F0;--acc-s:#E7FBF8;--bg:#FFF8FB;--card:#FFFFFF;--tx:#2D2430;--tx2:#8F7F89;--line:#F2E8ED;--exp:#C94150;--inc:#2376AA;--sh:0 3px 14px rgba(144,75,101,.09)}
+[data-mode=dark]{--bg:#191619;--card:#262126;--tx:#F8F1F5;--tx2:#B6A5B1;--line:#443740;--exp:#FF8B96;--inc:#78C7F1;--sh:0 3px 14px rgba(0,0,0,.15)}
+html,body{background:var(--bg)}
+.card,.list,.per div,.catbtn,.amtbox,.tbox,.chip{border:1px solid var(--line);box-shadow:var(--sh)}
+.card{border-radius:22px;padding:18px}
+.row{padding:13px 15px}
+.cic{border-radius:14px}
+.top .ib.on,.rptcard,.row.hl{background:var(--pri-s)!important;color:var(--pri)}
+.day.sel,.ymg button.on{background:var(--pri)}
+nav{background:var(--card);border-top:1px solid var(--line)}
+nav .fab{background:var(--pri);box-shadow:0 7px 18px rgba(245,142,179,.26)}
+.btn,.kp .ok,.kpsave button,.kbok button{background:var(--pri)}
+.swap,.chipz button.on{background:var(--acc-s);color:#287E7C}
+.seg button.on{color:var(--pri)}
+.seg.exp button.on{color:var(--exp)}
+.seg.inc button.on{color:var(--inc)}
+.exp,.amtbox.expense .big{color:var(--exp)}
+.inc,.amtbox.income .big{color:var(--inc)}
+button:focus-visible,.tap:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.tap,.layer{transition:none}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <script src="config.js"></script>
 </head>
@@ -323,8 +340,8 @@ body{zoom:var(--z)}
      }
    }
    ========================================================= */
-// 功能開關：可在 config.js 用 window.MONEY_OPTIONS = {carrier:false} 關閉載具
-const FEAT = {carrier:true, ...(window.MONEY_OPTIONS || {})};
+// 功能開關：可在 config.js 用 window.MONEY_OPTIONS 設定（v2.5 起載具功能已移除）
+const FEAT = {...(window.MONEY_OPTIONS || {})};
 // 雲端設定放在同資料夾的 config.js（換人使用時只要改那個檔）
 const FIREBASE_CONFIG = (window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.apiKey) ? window.FIREBASE_CONFIG : null;
 /* 範例：
@@ -337,7 +354,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'v2.4';
+const VERSION = 'V3';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -398,7 +415,6 @@ const ICONS = {
   swap:'M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7',
   plus:'M12 5v14M5 12h14', chart:'M4 4v16h16M8 15l4-4 3 3 5-6', minus:'M5 12h14', cart:'M3 4h2.5l2.2 10.5h10.1L20 7.5H6.4M9.5 19.5h.01M16.5 19.5h.01',
   homeNav:'M4 10l8-6 8 6v10h-5v-6H9v6H4z',
-  barcode:'M4 5v14M7 5v14M10 5v10M13 5v14M16 5v10M19 5v14',
   gear:'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9L7 7M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1',
   left:'M15 6l-6 6 6 6', right:'M9 6l6 6-6 6', down:'M6 9l6 6 6-6',
   cal:'M4 6h16v14H4zM4 10h16M8 3v4M16 3v4',
@@ -470,14 +486,15 @@ function defaultData(){
 const S = {
   mode:'local', user:null, ledgerId:null, ready:false,
   data:{accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}},
-  settings:{theme:'rose', custom:{pri:'#C0707C', acc:'#2A8378'}, carrier:'', rateOverride:{}},
+  settings:{theme:'rose', custom:{pri:'#C0707C', acc:'#2A8378'}, rateOverride:{}},
   ui:{tab:'home', sel:today(), acct:null, sorting:false, showArch:false, rp:{seg:'over', ov:'6', per:'month', type:'expense', y:new Date().getFullYear(), m:new Date().getMonth()}}
 };
 // 同一網域放多份 Money（例如 GitHub Pages 的不同倉庫）時，各自的設定分開存，不互相干擾
 const STORE_NS = (() => { const d = location.pathname.replace(/[^/]*$/, ''); return d === '/' ? '' : '@' + d; })();
 const PREF_KEY = 'money_prefs' + STORE_NS, LOCAL_KEY = 'money_local_v1' + STORE_NS, RATE_KEY = 'money_rates';
-let P = {mode:'time', darkFrom:'22:00', darkTo:'08:00', lastCat:{}, lastAcc:null, carrier:''};
+let P = {mode:'time', darkFrom:'22:00', darkTo:'08:00', lastCat:{}, lastAcc:null};
 try { Object.assign(P, JSON.parse(localStorage.getItem(PREF_KEY) || '{}')); } catch(e){}
+if ('carrier' in P) { delete P.carrier; try { localStorage.setItem(PREF_KEY, JSON.stringify(P)); } catch(e){} }   // v2.5：載具移除，清掉本機舊號碼
 const savePrefs = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(P)); } catch(e){} };
 let RATES = {at:0, r:{}};
 try { RATES = JSON.parse(localStorage.getItem(RATE_KEY)) || RATES; } catch(e){}
@@ -513,8 +530,7 @@ function colorSave(k, v){ colorPrev(k, v); clearTimeout(colorT); colorT = setTim
 function colorDone(){ setTimeout(() => { if (!document.activeElement || document.activeElement.type !== 'color') render(); }, 500); }
 function setNickname(){ const v = prompt('顯示名稱', S.settings.nickname || ''); if (v === null) return; putSettings({nickname:v.trim().slice(0, 20)}); }
 function putSettings(patch){
-  S.settings = {...S.settings, ...patch};
-  if ('carrier' in patch) { P.carrier = patch.carrier; savePrefs(); }
+  S.settings = {...S.settings, ...patch}; delete S.settings.carrier;   // v2.5：載具移除，存設定時一併清掉舊欄位
   if (S.mode === 'cloud') { const st = S.settings; cloudWrite(L => L.collection('meta').doc('settings').set(clean(st))); bump(); }
   else { saveLocal(); bump(); }
   applyTheme(); render();
@@ -800,18 +816,18 @@ function effMode(){
 setInterval(() => { if (P.mode === 'time' && document.documentElement.dataset.mode !== effMode()) applyTheme(); }, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTheme(); });
 function applyTheme(){
-  const th = S.settings.theme === 'custom' ? S.settings.custom : (THEMES[S.settings.theme] || THEMES.rose);
+  const th = {pri:'#F58EB3', acc:'#57C9C7'}; // V3 visual palette
   const dark = effMode() === 'dark', r = document.documentElement;
   r.dataset.mode = dark ? 'dark' : 'light';
   r.style.setProperty('--pri', th.pri); r.style.setProperty('--acc', th.acc);
   r.style.setProperty('--pri-s', dark ? mix(th.pri, '#211E1F', .72) : mix(th.pri, '#FFFFFF', .84));
   r.style.setProperty('--acc-s', dark ? mix(th.acc, '#211E1F', .72) : mix(th.acc, '#FFFFFF', .84));
-  document.querySelector('meta[name=theme-color]').content = dark ? '#151314' : '#FAF8F7';
+  document.querySelector('meta[name=theme-color]').content = dark ? '#181418' : '#FFF8FB';
   makeIcon(th.acc);
 }
 let iconFor = '';
 function makeIcon(color){
-  color = '#2BB3A3';   // v2.23：主畫面圖示固定湖水綠，不跟主題變
+  color = '#F58EB3';   // V3：APP 圖示採櫻花粉主色
   if (iconFor === color) return; iconFor = color;
   const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
   x.fillStyle = color; x.fillRect(0, 0, 180, 180);
@@ -846,14 +862,13 @@ const sheet = (key, title, body) => `<div class="bd" onclick="closeLayer('${key}
 function render(){
   if (S.mode === 'cloud' && !S.user) { $('#nav').innerHTML = ''; if (!AUTH_KNOWN) { $('#app').innerHTML = '<div class="empty" style="padding-top:40vh">載入中…</div>'; return; } return renderLogin(); }
   if (!S.ready) { $('#app').innerHTML = '<div class="empty" style="padding-top:40vh">載入中…</div>'; return; }
-  const v = {home:viewHome, accounts:viewAccounts, acct:viewAcct, carrier:viewCarrier, settings:viewSettings, reports:viewReports}[S.ui.tab] || viewHome;
+  const v = {home:viewHome, accounts:viewAccounts, acct:viewAcct, settings:viewSettings, reports:viewReports}[S.ui.tab] || viewHome;
   const cols = ['reports', 'accounts', 'settings', 'acct'].includes(S.ui.tab);
   $('#app').className = cols ? 'cols' : '';
   $('#app').innerHTML = cols ? `<div class="colw">${v()}</div>` : v();
   renderNav(); NAVCUR = navSnap();
   if (NAVSTK.length && NAVSTK[NAVSTK.length - 1].link && S.ui.tab !== 'acct') { const t = $('#app .top'); if (t && t.firstElementChild) { const h = t.firstElementChild, w = document.createElement('div');
     w.style.cssText = 'display:flex;align-items:center;gap:2px;min-width:0'; w.innerHTML = `<button class="ib" onclick="goBack()" aria-label="返回">${ic('left',24)}</button>`; t.insertBefore(w, h); w.appendChild(h); } }
-  if (S.ui.tab === 'carrier') drawBarcode();
   if (S.ui.tab === 'accounts' && S.ui.sorting) mountSort();
   if (S.ui.tab === 'home') mountSwipe();
 }
@@ -875,7 +890,7 @@ function navPush(tab){
 }
 let NAVTAB = false;
 function navTab(tab){ if (tab === S.ui.tab) { scrollTo(0, 0); return; } NAVTAB = true; navPush(tab); NAVTAB = false; go(tab, true); }   // v2.41：底部選單切頁也記，返回回上一頁
-function go(tab, noPush){ if (tab === 'carrier' && !FEAT.carrier) tab = 'home'; if (!noPush) navPush(tab); if (LOCK_PENDING && tab !== 'carrier') { LOCK_PENDING = false; LOCKED = true; PIN_IN = ''; drawLock(); } S.ui.tab = tab; S.ui.sorting = false; if (tab === 'carrier') history.replaceState(null, '', '#carrier'); else if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
+function go(tab, noPush){ if (!noPush) navPush(tab); S.ui.tab = tab; S.ui.sorting = false; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
 
 /* ---------- home ---------- */
 function catOf(id){ return S.data.categories[id]; }
@@ -986,7 +1001,7 @@ function viewHome(){
   const [pmY, pmM] = prevYM(y, m), mPrev = summary(ds(new Date(pmY, pmM, 1)), sameDayCut(pmY, pmM, sel)), mNow = summary(mFrom, sel);
   return `<div class="top"><div><div class="brand">${esc(S.settings.nickname || 'MONEY')}</div><h1 style="cursor:pointer" onclick="openYM('home')">${y} 年 ${m+1} 月 <span style="font-size:14px;color:var(--tx2)">▾</span></h1></div>
     <div style="display:flex;gap:4px">${sel !== td ? `<button class="ib" onclick="selDay('${td}')" style="font-size:13px;width:auto;padding:0 10px;color:var(--acc)">今天</button>` : ''}
-    <button class="ib" onclick="openSearch()">${ic('search',22)}</button>${FEAT.carrier ? `<button class="ib" onclick="go('carrier')">${ic('barcode',22)}</button>` : ''}<button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
+    <button class="ib" onclick="openSearch()">${ic('search',22)}</button><button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
     <div class="hcols"><div class="hc1">${alerts()}${monthReportCard()}
     <div class="week" id="week"><button class="arr" onclick="selDay('${addD(sel,-7)}')">${ic('left',20)}</button><div class="days">${days}</div><button class="arr" onclick="selDay('${addD(sel,7)}')">${ic('right',20)}</button></div>
     <div class="card"><div class="sum3">
@@ -1903,6 +1918,71 @@ function quickCat(parent){
 }
 
 
+/* v2.6 報表導覽：沿用原有 summary / catTotals / flowsIn 計算，不改動帳務 */
+let R26 = {monthKey:null, kind:'expense'};
+function reportMonthOpen(y,m){
+  R26.monthKey = `${y}-${pad(m+1)}`;
+  R26.kind = 'expense';
+  openLayer('r26month', renderReportMonth26, 'full');
+}
+function reportMonthChange(n){
+  let [y,m] = R26.monthKey.split('-').map(Number); m = m-1+n;
+  y += Math.floor(m/12); m = ((m%12)+12)%12;
+  R26.monthKey = `${y}-${pad(m+1)}`; redraw('r26month');
+}
+function reportMonthPick(){
+  const [y,m]=R26.monthKey.split('-').map(Number);
+  openYMcb(y,m-1,false,(yy,mm)=>{R26.monthKey=`${yy}-${pad(mm+1)}`;redraw('r26month');});
+}
+function reportDayOpen(date){
+  R26.date=date; R26.kind='expense';
+  openLayer('r26day', renderReportDay26, 'full');
+}
+function reportDayChange(n){R26.date=addD(R26.date,n);redraw('r26day');}
+function reportDayPick(){const d=pd(R26.date);openYMcb(d.getFullYear(),d.getMonth(),false,(yy,mm)=>{
+  const max=dim(yy,mm), day=Math.min(d.getDate(),max);
+  R26.date=ds(new Date(yy,mm,day));redraw('r26day');
+  openReportDayCalendar26(yy,mm);
+});}
+function reportCalendarMonth26(n){const d=new Date(R26.calY,R26.calM+n,1);R26.calY=d.getFullYear();R26.calM=d.getMonth();redraw('r26calendar');}
+function openReportDayCalendar26(y,m){
+  R26.calY=y;R26.calM=m;
+  openLayer('r26calendar',()=>{
+    y=R26.calY;m=R26.calM;const first=new Date(y,m,1).getDay(), n=dim(y,m), offset=(first+6)%7;
+    const cells=Array.from({length:offset},()=>'<span></span>').concat(Array.from({length:n},(_,i)=>{
+      const d=ds(new Date(y,m,i+1)), z=summary(d,d);return `<button class="${d===R26.date?'on':''}" onclick="R26.date='${d}';closeLayer('r26calendar');redraw('r26day')" style="padding:9px 3px;border-radius:9px;background:${d===R26.date?'var(--pri)':'var(--bg)'};color:${d===R26.date?'white':'var(--tx)'}">${i+1}${z.inc||z.exp?'<small style="display:block;font-size:9px">•</small>':''}</button>`;}));
+    return sheet('r26calendar',`選擇日期`, `<div class="rbar" style="margin:0 0 12px"><span></span><div class="nav2"><button onclick="reportCalendarMonth26(-1)">${ic('left',20)}</button><b>${y} 年 ${m+1} 月</b><button onclick="reportCalendarMonth26(1)">${ic('right',20)}</button></div></div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center">${['一','二','三','四','五','六','日'].map(x=>`<small class="tx2">${x}</small>`).join('')}${cells.join('')}</div>`);
+  },'btm');
+}
+function reportType26(type){R26.kind=type;redraw(LAYERS.length&&LAYERS[LAYERS.length-1].key==='r26day'?'r26day':'r26month');}
+function reportSummary26(from,to){const z=summary(from,to);return `<div class="card mt0"><div class="sum3"><div><small class="tx2">收入</small><b class="inc">${twd(z.inc)}</b></div><div><small class="tx2">支出</small><b class="exp">${twd(z.exp)}</b></div><div><small class="tx2">結餘</small><b>${twd(z.inc-z.exp)}</b></div></div></div>`;}
+function reportCatBlock26(from,to){
+  const type=R26.kind, totals=catTotals(from,to,type), items=catItems(totals), total=items.reduce((n,x)=>n+x.val,0);
+  return `<div class="segw"><div class="seg ${type==='expense'?'exp':'inc'}"><button class="${type==='expense'?'on':''}" onclick="reportType26('expense')">支出</button><button class="${type==='income'?'on':''}" onclick="reportType26('income')">收入</button></div></div>
+    <div class="card">${donut(items,type==='expense'?'支出分類':'收入分類',twd(total)).replace(/onclick="donutPick\('([^']+)'\)"/g,(_,id)=>`onclick="openCatRpt('${id}','${from}','${to}','${type}')"`)}</div>
+    <div class="sec"><h3>分類金額排行</h3><span class="sm tx2">點分類查看分析</span></div>
+    <div class="list">${items.length?catList(items,it=>`openCatRpt('${it.id}','${from}','${to}','${type}')`):'<div class="empty">沒有紀錄</div>'}</div>`;
+}
+function reportDayBars26(y,m){
+  const n=dim(y,m), vals=Array.from({length:n},(_,i)=>{const d=ds(new Date(y,m,i+1));return summary(d,d).exp;});
+  return `<div class="card"><div class="sec" style="margin:0 0 5px"><h3>每日支出</h3><small class="tx2">點柱狀位置看當日分析</small></div><div style="position:relative">${bars(vals.map((_,i)=>i+1),[{vals,color:'var(--exp)'}],5)}<div style="position:absolute;inset:0;display:grid;grid-template-columns:repeat(${n},1fr)">${vals.map((_,i)=>`<button title="${m+1}/${i+1}" aria-label="${m+1}月${i+1}日分析" onclick="reportDayOpen('${ds(new Date(y,m,i+1))}')" style="min-width:0"></button>`).join('')}</div></div></div>`;
+}
+function renderReportMonth26(){
+  const [y,mm]=R26.monthKey.split('-').map(Number),m=mm-1,[from,to]=mRange(y,m);
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('r26month')">${ic('left',24)}</button><h2>${y} 年 ${mm} 月分析</h2><span style="width:40px"></span></div>
+  <div class="fscroll"><div class="rbar"><span></span><div class="nav2"><button onclick="reportMonthChange(-1)">${ic('left',20)}</button><span class="ymt" onclick="reportMonthPick()">${y} 年 ${mm} 月 ▾</span><button onclick="reportMonthChange(1)">${ic('right',20)}</button></div></div>
+  ${reportSummary26(from,to)}${reportCatBlock26(from,to)}${reportDayBars26(y,m)}
+  <div class="sec"><h3>每日收支</h3><span class="sm tx2">點日期查看分析</span></div><div class="list">${Array.from({length:dim(y,m)},(_,i)=>dim(y,m)-i).map(d=>{const date=ds(new Date(y,m,d)),z=summary(date,date);return z.inc||z.exp?`<button class="row" onclick="reportDayOpen('${date}')"><span class="mid"><b>${mm}/${d}</b><small>收入 ${twd(z.inc)}・支出 ${twd(z.exp)}</small></span><span>${ic('right',18)}</span></button>`:''}).join('')||'<div class="empty">沒有紀錄</div>'}</div><div style="height:25px"></div></div></div>`;
+}
+function renderReportDay26(){
+  const date=R26.date,[y,m,d]=date.split('-').map(Number), from=date,to=date;
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('r26day')">${ic('left',24)}</button><h2>${y}/${m}/${d} 當日分析</h2><span style="width:40px"></span></div>
+  <div class="fscroll"><div class="rbar"><span></span><div class="nav2"><button onclick="reportDayChange(-1)">${ic('left',20)}</button><span class="ymt" onclick="openReportDayCalendar26(${y},${m-1})">${y}/${m}/${d} ▾</span><button onclick="reportDayChange(1)">${ic('right',20)}</button></div></div>
+  ${reportSummary26(from,to)}${reportCatBlock26(from,to)}<div class="sec"><h3>當日${R26.kind==='expense'?'支出':'收入'}明細</h3></div>
+  <div class="list">${(()=>{const rows=flowGroups(catFlows(date,date,R26.kind)).reverse();return rows.length?rows.map(r=>r.k!==undefined?pieceRow(r,{withDate:true}):txnRow(r.t,null,true)).join(''):'<div class="empty">沒有紀錄</div>'})()}</div><div style="height:25px"></div></div></div>`;
+}
+function reportSelectMonth26(i,ms){UX.ovSel=i; const x=ms[i];if(x){S.ui.rp.y=x.y;S.ui.rp.m=x.m;}render();}
+
 /* ---------- reports ---------- */
 function rpRange(r = S.ui.rp){
   if (r.per === 'month') return [ds(new Date(r.y, r.m, 1)), ds(new Date(r.y, r.m, dim(r.y, r.m))), `${r.y} 年 ${r.m+1} 月`];
@@ -1978,7 +2058,7 @@ function sameDayCut(y, m, ref){ const d = Math.min(pd(ref).getDate(), dim(y, m))
 const pct = (a, b) => b ? (a - b) / b * 100 : 0;
 const cmpTxt = (p, lbl) => `<span class="cmp" style="color:${p > 0 ? 'var(--exp)' : 'var(--acc)'}">${lbl} ${p > 0 ? '+' : '−'}${Math.abs(p).toFixed(0)}%</span>`;
 /* 月份列（總覽、預算、資產共用）：‹ 2026 年 10 月 ▾ › */
-function mShift(n){ const r = S.ui.rp; r.m += n; while (r.m < 0) { r.m += 12; r.y--; } while (r.m > 11) { r.m -= 12; r.y++; } UX.ovSel = null; render(); }
+function mShift(n){ UX.ovFocus=null; const r = S.ui.rp; r.m += n; while (r.m < 0) { r.m += 12; r.y--; } while (r.m > 11) { r.m -= 12; r.y++; } UX.ovSel = null; render(); }
 function monthNav(left = '<span></span>'){ const r = S.ui.rp, now = new Date(), isCur = r.y === now.getFullYear() && r.m === now.getMonth();
   return `<div class="rbar">${left}<div class="nav2"><button onclick="mShift(-1)">${ic('left',20)}</button><span class="ymt" onclick="openYM('rpm')">${r.y} 年 ${r.m + 1} 月 ▾</span><button onclick="mShift(1)" ${isCur ? 'disabled style="opacity:.3"' : ''}>${ic('right',20)}</button></div></div>`; }
 /* 多條折線（可開關、可點月份） */
@@ -2000,7 +2080,7 @@ function multiLine(labels, series, selIdx, onPick, goal){
   out += `<text x="2" y="10" font-size="10" style="fill:var(--tx2)">${twd(mx)}</text>`;
   return `<div class="chart"><svg viewBox="${sl ? '-22 0 ' + (W + 22) : '0 0 ' + W} ${H}">${out}</svg></div>`;
 }
-function ovPick(i){ UX.ovSel = UX.ovSel === i ? null : i; render(); }
+function ovPick(i){ const r=S.ui.rp;const cr=r.ov==='c'?ovRange():null;const m=(cr?cr.months:monthsBack(r.y,r.m,+r.ov))[i];UX.ovSel=i;if(m){UX.ovFocus={y:m[0],m:m[1]};}render(); }
 function ovTog(k){ UX.ovHide[k] = k === 'sr' ? UX.ovHide.sr === false : !UX.ovHide[k]; render(); }
 const smallMax = () => +S.settings.smallMax || 200;
 function setSmallMax(){ const v = parseInt(prompt('小額消費門檻（元，含以下）', smallMax())); if (v > 0) putSettings({smallMax:v}); }
@@ -2033,8 +2113,8 @@ function viewOverview(){
       <div class="card"><div class="ovk"><div class="tap" onclick="goRp('cat','month',${cy},${cm},'expense')"><small>${isCur ? '到今天花' : '整月支出'} ›</small><b class="exp">${twd(spent)}</b>${pSame ? cmpTxt(pct(spent, pSame), '比上月同期') : ''}</div>
         <div class="tap" onclick="${bt ? `goRp('budget','month',${cy},${cm})` : `goRp('cat','month',${cy},${cm},'expense')`}"><small>${isCur ? '月底預估' : '預算'} ›</small><b>${isCur ? twd(est) : bt ? twd(bt) : '—'}</b>${bt && isCur ? `<span class="${est > bt ? 'exp' : 'tx2'}">${est > bt ? '照這速度會超出預算' : '在預算內'}</span>` : ''}</div>
         <div class="tap" onclick="goRp('cat','month',${cy},${cm},'income')"><small>本月收入 ›</small><b class="inc">${twd(inc)}</b></div></div></div>
-      <div class="card">${bars(dCur.concat(Array(n - day).fill(0)).map((_, i) => `${cm + 1}/${i + 1}`), [{vals:dCur.concat(Array(n - day).fill(0)), color:'var(--exp)'}], 5)}<div class="sm tx2" style="margin-top:4px">每日支出・點下面日期看明細</div></div>
-      <div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>日期</th><th>收入</th><th>支出</th></tr>${[...Array(day)].map((_, i) => day - i).map(d => { const x = ds(new Date(cy, cm, d)), sm = summary(x, x); return sm.inc || sm.exp ? `<tr onclick="S.ui.sel='${x}';go('home')" style="cursor:pointer"><td>${x.replace(/-/g, '/')}（${WD[pd(x).getDay()]}）</td><td class="inc">${sm.inc ? twd(sm.inc) : ''}</td><td class="exp">${sm.exp ? twd(sm.exp) : ''}</td></tr>` : ''; }).join('')}</table></div>`;
+      ${reportDayBars26(cy,cm)}
+      <div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>日期</th><th>收入</th><th>支出</th></tr>${[...Array(day)].map((_, i) => day - i).map(d => { const x = ds(new Date(cy, cm, d)), sm = summary(x, x); return sm.inc || sm.exp ? `<tr onclick="reportDayOpen('${x}')" style="cursor:pointer"><td>${x.replace(/-/g, '/')}（${WD[pd(x).getDay()]}）</td><td class="inc">${sm.inc ? twd(sm.inc) : ''}</td><td class="exp">${sm.exp ? twd(sm.exp) : ''}</td></tr>` : ''; }).join('')}</table></div>`;
   } else {
     const N = CR ? CR.months.length : +ov, ms = (CR ? CR.months : monthsBack(cy, cm, N)).map(([y, m]) => monthStat(y, m, CR ? CR.cut : null)), lbl = ms.map(x => ymS(x.y, x.m));
     const ser = [{k:'inc', l:'收入', vals:ms.map(x => x.inc), color:'var(--inc)'}, {k:'exp', l:'支出', vals:ms.map(x => x.exp), color:'var(--exp)'},
@@ -2045,32 +2125,47 @@ function viewOverview(){
       <div class="lg2">${ser.map(x => leg(x.k, x.l, x.color, x.dash)).join('')}</div>
       ${sx ? `<div class="selbox"><b>${ymS(sx.y, sx.m)}</b><span class="inc">收入 ${twd(sx.inc)}</span><span class="exp">支出 ${twd(sx.exp)}</span><span>結餘 ${twd(sx.net)}</span><span style="color:#8E6CC0">儲蓄率 ${sx.inc ? (sx.net / sx.inc * 100).toFixed(0) : 0}%</span>${hasFixed ? `<span class="tx2">固定 ${twd(sx.fix)}・可省 ${twd(sx.save)}</span>` : ''}</div>` : ''}
       ${hasFixed ? '' : `<div class="sm tx2" style="margin-top:6px">想看「可省支出」？<button style="color:var(--acc);font-weight:600" onclick="openFixed()">設定固定支出分類</button></div>`}</div>`;
-    const cur = monthStat(cy, cm), prevS = monthStat(py, pm, isCur ? sameDayCut(py, pm, td) : null), done = ms.slice(0, -1), prevFull = done[done.length - 1];
-    const sr = x => x && x.inc ? x.net / x.inc * 100 : 0, avg = done.length ? done.reduce((s2, x) => s2 + x.exp, 0) / done.length : 0, cp = pct(cur.exp, prevS.exp);
-    const fst = (compute().list[0] || {}).date || td, ly0 = ds(new Date(cy - 1, cm, 1)), lyS = monthStat(cy - 1, cm, isCur ? sameDayCut(cy - 1, cm, td) : null);
-    const yoy = ly0 < fst.slice(0, 8) + '01' ? '<span class="tx2 cmp">去年無資料</span>' : lyS.exp ? cmpTxt(pct(cur.exp, lyS.exp), '比去年同期') : '<span class="tx2 cmp">去年同期無支出</span>';
+    // V3：趨勢圖點選月份後，所有月比較、儲蓄率及其基準同步選取月份。
+    const focus = (!CR && UX.ovFocus) ? UX.ovFocus : (sx ? {y:sx.y,m:sx.m} : {y:cy,m:cm});
+    const fy=focus.y, fm=focus.m, focusCurrent=fy===now.getFullYear()&&fm===now.getMonth();
+    const [fpy,fpm]=prevYM(fy,fm);
+    const cur=monthStat(fy,fm), prevS=monthStat(fpy,fpm,focusCurrent?sameDayCut(fpy,fpm,td):null);
+    const hist=monthsBack(fy,fm,N).slice(0,-1).map(([yy,mm])=>monthStat(yy,mm));
+    const prevFull=monthStat(fpy,fpm);
+    const sr=x=>x&&x.inc?x.net/x.inc*100:0;
+    const avg=hist.length?hist.reduce((s2,x)=>s2+x.exp,0)/hist.length:0;
+    const cp=pct(cur.exp,prevS.exp);
+    const fst=(compute().list[0]||{}).date||td;
+    const ly0=ds(new Date(fy-1,fm,1));
+    const lyS=monthStat(fy-1,fm,focusCurrent?sameDayCut(fy-1,fm,td):null);
+    const yoy=ly0<fst.slice(0,8)+'01'?'<span class="tx2 cmp">去年無資料</span>':lyS.exp?cmpTxt(pct(cur.exp,lyS.exp),'比去年同期'):'<span class="tx2 cmp">去年同期無支出</span>';
     const more = `<div class="sm" style="margin-top:8px;text-align:right;color:var(--acc);font-weight:600">每月收支明細 ›</div>`;
-    if (CR) { const T = ms.reduce((o, x) => ({inc:o.inc + x.inc, exp:o.exp + x.exp}), {inc:0, exp:0}), net = T.inc - T.exp;
+    const viewMonth = cur;
+    const monthCard26 = `<div class="sec"><h3>${viewMonth.y} 年 ${viewMonth.m+1} 月總覽</h3><button class="sm" style="color:var(--acc);font-weight:600" onclick="openOvTbl()">每月明細 ›</button></div><button class="card" style="width:calc(100% - 32px);text-align:left;display:block;margin-top:0" onclick="reportMonthOpen(${viewMonth.y},${viewMonth.m})"><div class="sum3"><div><small class="tx2">收入</small><b class="inc">${twd(viewMonth.inc)}</b></div><div><small class="tx2">支出</small><b class="exp">${twd(viewMonth.exp)}</b></div><div><small class="tx2">結餘</small><b>${twd(viewMonth.net)}</b></div></div><div class="sm" style="margin-top:8px;text-align:right;color:var(--acc)">查看當月分析 ›</div></button>`;
+    if (CR) { main += monthCard26; const T = ms.reduce((o, x) => ({inc:o.inc + x.inc, exp:o.exp + x.exp}), {inc:0, exp:0}), net = T.inc - T.exp;
       main += `<div class="card tap" onclick="openOvTbl()"><div class="ovk"><div><small>期間收入</small><b class="inc">${twd(T.inc)}</b></div><div><small>期間支出</small><b class="exp">${twd(T.exp)}</b><span class="tx2">月均 ${twd(T.exp / N)}</span></div>
         <div><small>結餘・儲蓄率</small><b class="${net < 0 ? 'exp' : ''}">${twd(net)}</b><span style="color:${net >= 0 ? 'var(--acc)' : 'var(--exp)'}">${T.inc ? (net / T.inc * 100).toFixed(0) : 0}%${S.settings.srGoal ? `（目標 ${S.settings.srGoal}%）` : ''}</span></div></div>${more}</div>`; }
-    else main += `<div class="card tap" onclick="openOvTbl()"><div class="ovk"><div><small>${isCur ? '本月' : ymS(cy, cm)} 儲蓄率</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span>${S.settings.srGoal ? `<span style="color:${sr(cur) >= S.settings.srGoal ? 'var(--acc)' : 'var(--exp)'}">目標 ${S.settings.srGoal}%・${sr(cur) >= S.settings.srGoal ? '達成' : '未達'}</span>` : ''}</div>
-      <div><small>月均支出</small><b>${twd(avg)}</b><span class="tx2">前 ${done.length} 個月</span></div>
-      <div><small>支出比上月</small><b style="color:${cp > 0 ? 'var(--exp)' : 'var(--acc)'}">${prevS.exp ? (cp > 0 ? '+' : '−') + Math.abs(cp).toFixed(0) + '%' : '—'}</b><span class="tx2">${isCur ? '同期比較' : '整月比較'}</span>${yoy}</div></div>${more}</div>`;
+    else main += monthCard26 + `<div class="card tap" onclick="openOvTbl()"><div class="ovk"><div><small>${focusCurrent ? '本月' : ymS(fy, fm)} 儲蓄率</small><b style="color:${sr(cur) >= 0 ? 'var(--acc)' : 'var(--exp)'}">${sr(cur).toFixed(0)}%</b><span class="tx2">前月 ${sr(prevFull).toFixed(0)}%</span>${S.settings.srGoal ? `<span style="color:${sr(cur) >= S.settings.srGoal ? 'var(--acc)' : 'var(--exp)'}">目標 ${S.settings.srGoal}%・${sr(cur) >= S.settings.srGoal ? '達成' : '未達'}</span>` : ''}</div>
+      <div><small>月均支出</small><b>${twd(avg)}</b><span class="tx2">前 ${hist.length} 個月</span></div>
+      <div><small>支出比上月</small><b style="color:${cp > 0 ? 'var(--exp)' : 'var(--acc)'}">${prevS.exp ? (cp > 0 ? '+' : '−') + Math.abs(cp).toFixed(0) + '%' : '—'}</b><span class="tx2">${focusCurrent ? '同期比較' : '整月比較'}</span>${yoy}</div></div>${more}</div>`;
   }
   // 這個月變多的分類（比近 3 個月同期平均）；自訂區間：比前一段同長度
   let F0 = f0, T0 = t0, CUT = cut;
+  if (UX.ovFocus && !CR) { [F0,T0]=mRange(UX.ovFocus.y,UX.ovFocus.m);CUT=(T0>td?td:T0); }
   if (CR) { F0 = CR.from; T0 = CR.to; CUT = CR.cut; }
   const curC = catTotals(F0, CUT, 'expense'), base = {};
+  const [focusY,focusM]=UX.ovFocus&&!CR?[UX.ovFocus.y,UX.ovFocus.m]:[cy,cm];
+  const focusIsCurrent=focusY===now.getFullYear()&&focusM===now.getMonth();
   if (CR) { const len = diffD(CUT, F0), b1 = addD(F0, -1), b0 = addD(b1, -len), c = catTotals(b0, b1, 'expense'); for (const k in c) base[k] = c[k]; }
-  else monthsBack(cy, cm, 4).slice(0, 3).forEach(([y, m]) => { const c = catTotals(mRange(y, m)[0], isCur ? sameDayCut(y, m, td) : mRange(y, m)[1], 'expense'); for (const k in c) base[k] = (base[k] || 0) + c[k] / 3; });
+  else monthsBack(focusY, focusM, 4).slice(0, 3).forEach(([y, m]) => { const c = catTotals(mRange(y, m)[0], focusIsCurrent ? sameDayCut(y, m, td) : mRange(y, m)[1], 'expense'); for (const k in c) base[k] = (base[k] || 0) + c[k] / 3; });
   const ups = Object.keys({...curC, ...base}).map(k => ({k, d:(curC[k] || 0) - (base[k] || 0)})).filter(x => x.d >= 100).sort((a, b) => b.d - a.d).slice(0, 3);
-  const upCard = `<div class="sec"><h3>${CR ? '這段期間' : isCur ? '這個月' : ymS(cy, cm)} 變多的</h3><span class="sm tx2">${CR ? (addD(F0, -1 - diffD(CUT, F0)) < ((compute().list[0] || {}).date || td) ? '比前一段（資料不完整）' : '比前一段同長度期間') : `比前 3 個月${isCur ? '同期' : ''}平均`}</span></div><div class="list">${ups.length ? ups.map(x => { const c = S.data.categories[x.k];
+  const upCard = `<div class="sec"><h3>${CR ? '這段期間' : focusIsCurrent ? '這個月' : ymS(focusY, focusM)} 變多的</h3><span class="sm tx2">${CR ? (addD(F0, -1 - diffD(CUT, F0)) < ((compute().list[0] || {}).date || td) ? '比前一段（資料不完整）' : '比前一段同長度期間') : `比前 3 個月${focusIsCurrent ? '同期' : ''}平均`}</span></div><div class="list">${ups.length ? ups.map(x => { const c = S.data.categories[x.k];
     return `<button class="row" onclick="openCatRpt('${x.k}','${F0}','${T0}','expense')"><span class="cic" style="background:${c?.color || '#aaa'}">${ic(c?.icon || 'more',20)}</span><span class="mid"><b>${esc(c?.name || '未分類')}</b><small>${twd(curC[x.k] || 0)}・${CR ? '前一段' : '平均'} ${twd(base[x.k] || 0)}</small></span><span class="amt exp">+${twd(x.d)}</span></button>`; }).join('') : '<div class="empty">沒有明顯變多的分類 👍</div>'}</div>`;
   // 小額消費
   const SM = smallMax(), isSm = f => f.type === 'expense' && !isInstT(f.t) && f.cat !== FEE_CAT && f.t.amount <= SM;
   const sm = flowsIn(F0, CUT).filter(isSm), smT = sm.reduce((x, f) => x + f.amt, 0), byS = {};
   sm.forEach(f => { const k = (f.t.store || '').trim() || (S.data.categories[f.cat]?.name || '其他'); byS[k] = (byS[k] || 0) + 1; });
-  const topS = Object.entries(byS).sort((a, b) => b[1] - a[1]).slice(0, 3), m6 = CR ? CR.months.slice(-12) : monthsBack(cy, cm, 6), pm6 = m6.map(([y, m]) => flowsIn(...mRange(y, m)).filter(isSm).reduce((x, f) => x + f.amt, 0));
+  const topS = Object.entries(byS).sort((a, b) => b[1] - a[1]).slice(0, 3), m6 = CR ? CR.months.slice(-12) : monthsBack(focusY, focusM, 6), pm6 = m6.map(([y, m]) => flowsIn(...mRange(y, m)).filter(isSm).reduce((x, f) => x + f.amt, 0));
   const smCard = `<div class="sec"><h3>小額消費（$${SM} 以下）</h3><button class="sm" style="color:var(--acc);font-weight:600" onclick="setSmallMax()">改門檻</button></div>
     <button class="card" style="width:calc(100% - 32px);text-align:left;display:block;margin-top:0" onclick="SR={q:'',type:'expense',acc:'',cat:'',proj:'',from:'${F0}',to:'${CUT}',min:'',max:'${SM}',limit:100,more:true};openSearch()">
     <div class="ovk"><div><small>筆數</small><b>${sm.length} 筆</b></div><div><small>合計</small><b class="exp">${twd(smT)}</b></div><div><small>${CR ? '各月' : '近 6 個月'}</small>${sparkline(pm6)}</div></div>
@@ -2756,7 +2851,11 @@ function ptResHtml(){
   const tog = i => `PI._open=PI._open===${i}?null:${i};ptRefresh()`;
   let head, tbl;
   if (!r.card) {
-    head = `<div class="card mt0"><div class="sm tx2">${esc(a.name)} 目前 ${twd(r.T.b0)}</div><div style="font-size:18px;font-weight:700;margin-top:4px" class="${r.bad ? 'exp' : ''}">${esc(r.txt)}</div></div>`;
+    const sv = ptSave1(w, r);
+    head = `<div class="card mt0"><div class="sm tx2">${esc(a.name)} 目前 ${twd(r.T.b0)}</div><div style="font-size:18px;font-weight:700;margin-top:4px" class="${r.bad ? 'exp' : ''}">${esc(r.txt)}</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line)"><div class="sm">到 ${ptMon(sv.mi)} 每月存 <b>${twd(sv.per)}</b> 就能買</div>
+      ${sv.short >= 1 ? `<div class="sm exp" style="margin-top:2px">照目前預估還差 ${twd(sv.short)}，每月要多存 ${twd(sv.more)}</div>` : ''}
+      <button class="btn sec2" style="padding:9px;margin-top:8px" onclick="ptToGoal()">轉成存錢目標</button></div></div>`;
     tbl = `<table class="tbl"><tr><th>月份</th><th>進</th><th>出</th><th>月底</th></tr>${win.map(i => { const row = r.T.rows[i], buy = row.its.some(o => o.kind === 'this');
       return `<tr onclick="${tog(i)}" style="cursor:pointer;${buy ? 'background:var(--pri-s)' : ''}"><td>${ptMon(i)}${buy ? '<br><small style="color:var(--pri)">買</small>' : ''}</td><td class="inc">${row.inn ? twd(row.inn) : ''}</td><td class="exp">${row.out ? twd(row.out) : ''}</td><td class="b ${row.end < 0 ? 'exp' : ''}">${twd(row.end)}</td></tr>${PI._open === i ? det(row) : ''}`; }).join('')}</table>`;
   } else {
@@ -2772,9 +2871,22 @@ function ptResHtml(){
       <label style="display:flex;align-items:center;gap:10px;margin:-2px 0 10px;font-size:15px"><input id="pqR" type="checkbox" style="width:22px;height:22px;accent-color:var(--acc)" onchange="document.getElementById('pqUW').style.display=this.checked?'':'none'">每月重複</label>
       <div class="fld" id="pqUW" style="display:none"><label>到哪一天為止（可空＝一直重複）</label><input id="pqU" type="date"></div>
       <div class="two"><button class="btn sec2" style="padding:10px" onclick="PI._add='';ptRefresh()">取消</button><button class="btn" style="padding:10px" onclick="ptQuickAdd('${a.type === 'credit' ? (a.payAcct || '') : a.id}')">加入</button></div></div>` : '';
-  const addBlk = !r.card || a.payAcct ? (PI._add ? addF : `<div class="two" style="margin:0 16px 10px"><button class="btn sec2" style="padding:10px" onclick="PI._add='in';ptRefresh()">＋ 預計進帳</button><button class="btn sec2" style="padding:10px" onclick="PI._add='out';ptRefresh()">＋ 預估支出</button></div>`) : '';
+  const addBlk = !r.card ? (PI._add ? addF : `<div class="two" style="margin:0 16px 10px"><button class="btn sec2" style="padding:10px" onclick="PI._add='in';ptRefresh()">＋ 預計進帳</button><button class="btn sec2" style="padding:10px" onclick="PI._add='out';ptRefresh()">＋ 預估支出</button></div>`) : '';
   return `${addBlk}${head}${nav}<div class="card mt0" id="ptTbl" style="padding:10px 12px;margin-top:0">${tbl}</div>
     <div class="sm tx2" style="margin:0 20px">點月份看明細・左右滑看前後・越後面的月份只含已知卡費，還沒刷的消費算不到</div>`;
+}
+/* v2.5：現金／銀行／電子支付 → 每月要存多少（品項金額 ÷ 從本月到想買月份的月數；沒填月份＝最早能買的月份，都不夠＝12 個月） */
+function ptSave1(w, r){
+  const mi = w.ym ? Math.max(0, ptMi(w.ym + '-01')) : (r.bad ? 11 : r.mi), n = mi + 1, amt = +w.amt || 0;
+  let short = 0;
+  if (r.bad) short = w.ym ? Math.max(0, -Math.min(...r.T.rows.slice(mi).map(x => x.end))) : Math.max(0, amt - ptAcctT(w.aid, ptEngine(w.id), []).rows[mi].end);
+  return {mi, n, per:amt / n, short, more:short / n};
+}
+function ptToGoal(){
+  const w = ptValid(); if (!w) return; const a = S.data.accounts[w.aid]; if (!a || a.type === 'credit') return;
+  const sv = ptSave1(w, ptCalc(w)), n = new Date(), e = new Date(n.getFullYear(), n.getMonth() + sv.mi + 1, 0), start = today(); let date = ds(e); if (date <= start) date = addD(start, 1);
+  const g = {id:'g_' + uid(), name:w.name.trim(), target:w.amt, start, date, mode:'acct', aid:a.id};
+  putSettings({goals:[...(S.settings.goals || []), g]}); toast('已建立存錢目標，可到資產頁編輯');
 }
 function ptQuickAdd(aid){
   const n = document.getElementById('pqN').value.trim(), amt = parseFloat(document.getElementById('pqA').value), d = document.getElementById('pqD').value, rep = document.getElementById('pqR').checked, until = rep ? document.getElementById('pqU').value : '', key = PI._add === 'in' ? 'cfIn' : 'cfOut';
@@ -2947,7 +3059,7 @@ function ymPick(y, m){
   else if (k === 'home') { const d = pd(S.ui.sel).getDate(); selDay(ds(new Date(y, m, Math.min(d, dim(y, m))))); }
   else if (k === 'am') { S.ui.am = {y, m}; render(); }
   else if (k === 'stmt') { const a = S.data.accounts[STM.aid]; STM.close = cycDate(a, y, m); redraw('stmt'); }
-  else { S.ui.rp.y = y; S.ui.rp.m = m; UX.ovSel = null; render(); }
+  else { S.ui.rp.y = y; S.ui.rp.m = m; UX.ovSel = null; UX.ovFocus=null; render(); }
 }
 /* 圓餅點選 */
 function donutPick(id){ UX.dsel = UX.dsel === id ? null : id; render(); LAYERS.forEach(drawLayer); }
@@ -3031,13 +3143,13 @@ function viewReports(){
       const n = dim(r.y, r.m), days = [...Array(n)].map((_, i) => summary(ds(new Date(r.y, r.m, i + 1)), ds(new Date(r.y, r.m, i + 1))));
       const s = summary(from, to), passed = r.y === new Date().getFullYear() && r.m === new Date().getMonth() ? new Date().getDate() : n;
       const act = days.map((d, i) => ({...d, i})).filter(d => d.inc || d.exp).reverse();
-      body = `${periodBar()}<div class="card">${bars(days.map((_, i) => i + 1), [{vals:days.map(d => d.inc), color:'var(--inc)'}, {vals:days.map(d => d.exp), color:'var(--exp)'}], 5)}
+      body = `${periodBar()}<div class="card">${reportDayBars26(r.y,r.m)}
         <div class="legend"><span><i style="background:var(--inc)"></i>收入</span><span><i style="background:var(--exp)"></i>支出</span></div></div>
         <div class="card"><div class="kv"><div><small>收入</small><b class="inc">${twd(s.inc)}</b></div><div><small>支出</small><b class="exp">${twd(s.exp)}</b></div>
         <div><small>結餘</small><b>${twd(s.inc - s.exp)}</b></div><div><small>日均支出</small><b>${twd(s.exp / passed)}</b></div></div></div>
         <div class="sec"><h3>每日收支</h3><span class="sm tx2">點日期看明細</span></div>
         <div class="card mt0" style="margin-top:0"><table class="tbl"><tr><th>日期</th><th>收入</th><th>支出</th><th>結餘</th></tr>
-        ${act.length ? act.map(d => { const x = ds(new Date(r.y, r.m, d.i + 1)); return `<tr onclick="S.ui.sel='${x}';go('home')" style="cursor:pointer"><td>${d.i + 1} 日（${WD[pd(x).getDay()]}）</td><td class="inc">${d.inc ? twd(d.inc) : ''}</td><td class="exp">${d.exp ? twd(d.exp) : ''}</td><td class="${d.inc - d.exp < 0 ? 'exp' : ''}">${twd(d.inc - d.exp)}</td></tr>`; }).join('') : '<tr><td colspan="4" class="tx2" style="text-align:center">沒有紀錄</td></tr>'}</table></div>`;
+        ${act.length ? act.map(d => { const x = ds(new Date(r.y, r.m, d.i + 1)); return `<tr onclick="reportDayOpen('${x}')" style="cursor:pointer"><td>${d.i + 1} 日（${WD[pd(x).getDay()]}）</td><td class="inc">${d.inc ? twd(d.inc) : ''}</td><td class="exp">${d.exp ? twd(d.exp) : ''}</td><td class="${d.inc - d.exp < 0 ? 'exp' : ''}">${twd(d.inc - d.exp)}</td></tr>`; }).join('') : '<tr><td colspan="4" class="tx2" style="text-align:center">沒有紀錄</td></tr>'}</table></div>`;
     }
   } else if (r.seg === 'budget') {
     body = viewBudget();
@@ -3411,7 +3523,7 @@ async function doJsonImport(){
   toast('還原中…');
   try {
     for (const col of COLS) await bulkPut(col, Object.values(j.data[col] || {}).map(o => ({...o})));
-    if (j.settings) putSettings({...j.settings, carrier:j.settings.carrier || S.settings.carrier, rateOverride:j.settings.rateOverride || {}});
+    if (j.settings) putSettings({...j.settings, rateOverride:j.settings.rateOverride || {}});
     render(); toast(`已還原 ${Object.keys(j.data.txns || {}).length} 筆`);
   } catch(e) { toast('還原失敗：' + (e.code || e.message)); }
 }
@@ -3535,7 +3647,7 @@ async function pinHash(p){
   catch(e) { return 'h' + hashStr('money|' + p); }
 }
 let LOCKED = false, LOCK_PENDING = false, PIN_IN = '', hiddenAt = 0;
-function lockNow(){ if (!P.pin) return; if (S.ui.tab === 'carrier' && !LAYERS.length) { LOCK_PENDING = true; return; } LOCKED = true; PIN_IN = ''; drawLock(); }
+function lockNow(){ if (!P.pin) return; LOCKED = true; PIN_IN = ''; drawLock(); }
 function drawLock(){
   let el = document.getElementById('lock');
   if (!LOCKED) { el && el.remove(); return; }
@@ -3581,27 +3693,6 @@ function backupAlert(){
     <span style="display:flex;gap:10px;flex:none"><button class="b" style="color:var(--acc)" onclick="exportJSON()">備份</button><button class="tx2" onclick="P.backupSnooze=Date.now()+7*864e5;savePrefs();render()">稍後</button></span></div>`;
 }
 
-/* ---------- carrier ---------- */
-function viewCarrier(){
-  const code = S.settings.carrier || P.carrier;
-  return `<div class="top"><button class="ib" onclick="go('home')">${ic('left',24)}</button><h1 style="flex:1">手機條碼載具</h1>${code ? `<button class="ib" onclick="editCarrier()">${ic('edit',22)}</button>` : ''}</div>
-    ${code ? `<div class="bc"><svg id="bcsvg"></svg><div class="code">${esc(code)}</div></div>
-      <div style="margin:0 16px"><button class="btn" style="padding:16px;font-size:17px" onclick="openAdd()">＋ 記一筆</button></div>
-      <div class="hint">・結帳時給店員掃描，螢幕調到最亮比較好掃<br>・掃完直接按「記一筆」<br>・桌面直達：開啟網址後面加 carrier.html 的頁面，按「分享 → 加入主畫面」</div>`
-    : `<div class="card"><p class="mt0">輸入你的手機條碼（/ 開頭共 8 碼）</p><div class="fld"><input id="cin" placeholder="/ABC1234" autocapitalize="characters" style="font-size:20px;letter-spacing:3px"></div><button class="btn" onclick="saveCarrier($('#cin').value)">儲存</button></div>`}`;
-}
-function drawBarcode(){
-  const code = S.settings.carrier || P.carrier, el = $('#bcsvg'); if (!code || !el) return;
-  if (typeof JsBarcode === 'undefined') { el.outerHTML = '<div class="tx2">條碼元件載入失敗，請連網後重開</div>'; return; }
-  JsBarcode(el, code, {format:'CODE39', width:2.4, height:110, displayValue:false, margin:12, background:'#ffffff', lineColor:'#000000'});
-}
-function saveCarrier(v){
-  v = (v || '').trim().toUpperCase();
-  if (!/^\/[0-9A-Z.+\-]{7}$/.test(v)) return toast('格式：/ 開頭，後面 7 碼英數');
-  putSettings({carrier:v}); toast('已儲存');
-}
-function editCarrier(){ const v = prompt('手機條碼', S.settings.carrier || P.carrier); if (v !== null) saveCarrier(v); }
-
 /* ---------- settings ---------- */
 function viewSettings(){
   const th = S.settings.theme, cu = S.settings.custom || {};
@@ -3640,7 +3731,6 @@ function viewSettings(){
       <button class="row" onclick="openTplMgr()"><span class="mid"><b>常用範本</b><small>${tplList().length} 個</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openCatMgr()"><span class="mid"><b>分類管理</b><small>新增、改名、刪除</small></span>${ic('right',18)}</button>
       <button class="row" onclick="openProjMgr()"><span class="mid"><b>專案管理</b><small>${Object.values(S.data.projects).filter(p => !p.hidden).length} 個專案</small></span>${ic('right',18)}</button>
-      ${FEAT.carrier ? `<button class="row" onclick="editCarrier()"><span class="mid"><b>手機條碼載具</b><small>${esc(S.settings.carrier || P.carrier || '未設定')}</small></span>${ic('right',18)}</button>` : ''}
       ${S.mode === 'cloud' ? `<button class="row" onclick="openBk()"><span class="mid"><b>雲端自動備份</b><small>${S.settings.autoBk === false ? '已關閉' : '每週自動'}・上次 ${S.settings.bkLast ? (d => `${d.getMonth() + 1}/${d.getDate()}`)(new Date(+S.settings.bkLast)) : '還沒備份'}</small></span>${ic('right',18)}</button>` : ''}
       <button class="row" onclick="openExport()"><span class="mid"><b>匯出 CSV／完整備份</b><small>CSV 可用 Excel 開；備份檔可匯回</small></span>${ic('right',18)}</button>
       <button class="row" onclick="pickImport()"><span class="mid"><b>匯入</b><small>CMoney CSV、Money CSV、備份檔；同一筆不會重複</small></span>${ic('right',18)}</button></div>
@@ -3825,7 +3915,7 @@ async function attachLedger(u, keep){
     }, e => { toast('讀取失敗：' + e.code); if (first) { first = false; done(); } }));
   }
   let firstS = true;
-  unsubs.push(ledgerRef.collection('meta').doc('settings').onSnapshot(d => { if (d.exists) { S.settings = {...S.settings, ...d.data()}; if (S.settings.carrier) { P.carrier = S.settings.carrier; savePrefs(); } applyTheme(); sched(); } if (firstS) { firstS = false; done(); } }));
+  unsubs.push(ledgerRef.collection('meta').doc('settings').onSnapshot(d => { if (d.exists) { S.settings = {...S.settings, ...d.data()}; applyTheme(); sched(); } if (firstS) { firstS = false; done(); } }));
 }
 
 /* ---------- boot ---------- */
@@ -3836,7 +3926,6 @@ function afterReady(){
 }
 function openTplMgr(){ F = blankF(); openTpl(); }
 function boot(){
-  if (location.hash === '#carrier' && FEAT.carrier) S.ui.tab = 'carrier';
   if (P.pin) lockNow();
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
   if (FIREBASE_CONFIG && typeof firebase === 'undefined') {
@@ -3875,7 +3964,6 @@ function boot(){
     const l = readLocal();
     if (l && l.data) { S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}, ...l.data}; S.settings = {...S.settings, ...(l.settings || {})}; }
     else { S.data = defaultData(); saveLocal(); }
-    if (!S.settings.carrier && P.carrier) S.settings.carrier = P.carrier;
     S.ready = true; bump(); applyTheme(); render(); afterReady();
   }
   refreshRates();
@@ -3916,7 +4004,6 @@ addEventListener('popstate', () => {
 
 /* 離開 App 再回來：回到首頁＋今天（停靠點）。正在記帳且已輸入內容時保留，避免資料遺失 */
 let awayAt = 0, BUSY_UNTIL = 0;
-const LAUNCH_CARRIER = location.hash === '#carrier' && FEAT.carrier;
 const fSig = f => JSON.stringify({...f, active:0, kpHide:0, showPer:0, perAuto:0, _sig:0});
 function hasDraft(){ return LAYERS.some(l => l.key === 'add') && F && (F.amtExpr || F.note.trim()) && !(F._sig && F._sig === fSig(F)); }
 function backToDock(){
@@ -3925,8 +4012,8 @@ function backToDock(){
   for (const L of [...LAYERS]) if (!(keepAdd && L.key === 'add')) closeLayer(L.key, true);
   const n = new Date();
   S.ui.sel = today(); S.ui.sorting = false; S.ui.rp = {...S.ui.rp, per:'month', y:n.getFullYear(), m:n.getMonth()};
-  S.ui.tab = LAUNCH_CARRIER ? 'carrier' : 'home'; NAVSTK = [];
-  history.replaceState(null, '', location.pathname + location.search + (LAUNCH_CARRIER ? '#carrier' : ''));
+  S.ui.tab = 'home'; NAVSTK = [];
+  history.replaceState(null, '', location.pathname + location.search);
   render(); scrollTo(0, 0);
 }
 document.addEventListener('visibilitychange', () => {
