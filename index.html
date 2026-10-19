@@ -304,6 +304,33 @@ nav .fab{background:var(--pri);box-shadow:0 7px 18px rgba(245,142,179,.26)}
 .inc,.amtbox.income .big{color:var(--inc)}
 button:focus-visible,.tap:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.tap,.layer{transition:none}}
+
+/* V3.1 手機版面與子層統一修正 */
+@media(max-width:699px){
+  :root{--z:1}
+  html{font-size:16px}
+  body{zoom:1;font-size:16px}
+  .top h1{font-size:22px}
+  .sh{max-height:86dvh}
+  .layer.full .lin{width:100%;min-width:0;max-width:100%}
+  .layer .fscroll{min-width:0;overscroll-behavior:contain}
+  .lhd h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  .lhd>.ib,.lhd>.mini{flex:0 0 40px}
+  .sum3{gap:5px}
+  .sum3>div{min-width:0}
+  .sum3 b{font-size:clamp(13px,4vw,18px);letter-spacing:-.3px}
+  .ovk b,.kv b{font-size:clamp(13px,4vw,18px)}
+  .rbar .nav2{min-width:0;max-width:100%}
+  .rbar .nav2 .ymt{min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}
+  .card,.list,.per div{min-width:0}
+  .card .chart,.card svg{max-width:100%}
+}
+html,body,#app,#layers{max-width:100%}
+html,body{overflow-x:clip}
+.layer .lin,.layer .fscroll,.layer .bdy{min-width:0}
+.layer .lhd{flex-shrink:0}
+.layer .fscroll{overflow-x:hidden}
+
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -354,7 +381,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3';
+const VERSION = 'V3.1';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -850,11 +877,13 @@ function openLayer(key, fn, cls='full', mount){
   requestAnimationFrame(() => el.classList.add('on'));
 }
 function drawLayer(L){ L.el.innerHTML = L.fn(); L.mount && L.mount(L.el); }
-function redraw(key){ const L = LAYERS.find(l => l.key === key); if (L) drawLayer(L); }
+function redraw(key){ const L = LAYERS.find(l => l.key === key); if (!L) return; const old = L.el.querySelector('.fscroll,.bdy'); const y = old ? old.scrollTop : 0; drawLayer(L); const next = L.el.querySelector('.fscroll,.bdy'); if (next) next.scrollTop = y; }
 function closeLayer(key, instant){
   const i = key ? LAYERS.findIndex(l => l.key === key) : LAYERS.length - 1;
-  if (i < 0) return; const [L] = LAYERS.splice(i, 1);
-  if (instant) L.el.remove(); else { L.el.classList.remove('on'); setTimeout(() => L.el.remove(), 180); }
+  if (i < 0) return;
+  const [L] = LAYERS.splice(i, 1);
+  if (instant) L.el.remove();
+  else { L.el.classList.remove('on'); L.el.style.pointerEvents = 'none'; setTimeout(() => L.el.remove(), 180); }
 }
 const sheet = (key, title, body) => `<div class="bd" onclick="closeLayer('${key}')"></div><div class="sh"><div class="hd"><span>${title}</span><button class="mini" onclick="closeLayer('${key}')">${ic('x',20)}</button></div><div class="bdy">${body}</div></div>`;
 
@@ -3990,16 +4019,23 @@ addEventListener('popstate', () => {
   else history.back();
 });
 (function(){
-  if (navigator.standalone !== true) return;   // 只有 iPhone 主畫面 App 需要自己做手勢；瀏覽器與 Android 用系統返回
-  let x0 = null, y0 = 0, ind = null;
-  addEventListener('touchstart', e => { const t = e.touches[0]; if (t.clientX > 30 || !canGoBack()) return; x0 = t.clientX; y0 = t.clientY;
-    ind = document.createElement('div'); ind.id = 'swipeback'; ind.innerHTML = ic('left', 22); document.body.appendChild(ind); }, {passive:true});
-  addEventListener('touchmove', e => { if (x0 === null) return; const t = e.touches[0], dx = Math.max(0, t.clientX - x0);
-    if (dx > 55 && Math.abs(t.clientY - y0) < 50) { x0 = null; ind && ind.remove(); ind = null; goBack(true); return; }
-    ind.style.transform = `translate(${Math.min(dx, 90) - 44}px, ${t.clientY - 22}px) scale(${Math.min(1, .5 + dx / 160)})`; ind.style.opacity = Math.min(1, dx / 70); }, {passive:true});
-  addEventListener('touchend', e => { if (x0 === null) return; const t = e.changedTouches[0], dx = t.clientX - x0, dy = Math.abs(t.clientY - y0);
-    x0 = null; ind && ind.remove(); ind = null; if (dx > 70 && dy < 80) goBack(); });
-  addEventListener('touchcancel', () => { x0 = null; ind && ind.remove(); ind = null; });
+  if (navigator.standalone !== true) return;
+  let x0 = null, y0 = null, target = null;
+  const reset = () => { x0 = y0 = target = null; };
+  addEventListener('touchstart', e => {
+    if (e.touches.length !== 1 || !canGoBack()) return reset();
+    const t = e.touches[0];
+    if (t.clientX > 28 || e.target.closest('input,textarea,select,[contenteditable],.kp')) return reset();
+    x0 = t.clientX; y0 = t.clientY; target = e.target;
+  }, {passive:true});
+  addEventListener('touchend', e => {
+    if (x0 === null || !canGoBack()) return reset();
+    const t = e.changedTouches[0], dx = t.clientX-x0, dy = Math.abs(t.clientY-y0);
+    reset();
+    // 左緣開始的明確水平右滑才返回，與右上/左上返回鍵共用 goBack
+    if (dx >= 85 && dy < 60 && dx > dy*1.6) goBack();
+  }, {passive:true});
+  addEventListener('touchcancel', reset, {passive:true});
 })();
 
 /* 離開 App 再回來：回到首頁＋今天（停靠點）。正在記帳且已輸入內容時保留，避免資料遺失 */
