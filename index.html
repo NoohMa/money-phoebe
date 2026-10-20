@@ -395,7 +395,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.5';
+const VERSION = 'V3.6';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -951,7 +951,7 @@ function navPush(tab){
 }
 let NAVTAB = false;
 function navTab(tab){ if (tab === S.ui.tab) { scrollTo(0, 0); return; } NAVTAB = true; navPush(tab); NAVTAB = false; go(tab, true); }   // v2.41：底部選單切頁也記，返回回上一頁
-function go(tab, noPush){ if (!noPush) navPush(tab); S.ui.tab = tab; S.ui.sorting = false; if (location.hash) history.replaceState(null, '', location.pathname + location.search); render(); scrollTo(0, 0); }
+function go(tab, noPush){ if (!noPush) navPush(tab); S.ui.tab = tab; S.ui.sorting = false; if (location.hash) history.replaceState(history.state || {guard:1}, '', location.pathname + location.search); render(); scrollTo(0, 0); }
 
 /* ---------- home ---------- */
 function catOf(id){ return S.data.categories[id]; }
@@ -4073,9 +4073,12 @@ function boot(){
   refreshRates();
 }
 /* 返回：Android 返回鍵／手勢、瀏覽器上一頁、iPhone 主畫面 App 從左邊緣右滑 */
+let lastBackAt = 0;
 function canGoBack(){ return !LOCKED && (LAYERS.length > 0 || NAVSTK.length > 0 || S.ui.tab !== 'home'); }
 function goBack(fast){
   if (LOCKED) return false;
+  if (Date.now() - lastBackAt < 360) return true;
+  lastBackAt = Date.now();
   if (LAYERS.length) {
     const top = LAYERS[LAYERS.length - 1];
     if (top.key === 'add' && hasDraft() && !confirm('放棄這筆還沒存的紀錄？')) return true;
@@ -4095,7 +4098,7 @@ addEventListener('popstate', () => {
 });
 (function(){
   // Safari 主畫面模式使用觸控右滑；一般瀏覽器和 Android 由系統返回鍵處理。
-  if (navigator.standalone !== true) return;
+  if (!(navigator.standalone === true || /iP(hone|ad|od)/.test(navigator.userAgent))) return;
   let startX = null, startY = null;
   const reset = () => { startX = startY = null; };
   addEventListener('touchstart', e => {
@@ -4130,7 +4133,7 @@ function backToDock(){
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { awayAt = Date.now(); return; }
-  if (awayAt && Date.now() - awayAt >= (+P.dockAfter || 0) * 1000) backToDock();
+  if (awayAt && Date.now() - awayAt >= Math.max(5000, (+P.dockAfter || 0) * 1000) && !LAYERS.length && !NAVSTK.length && S.ui.tab === 'home') backToDock();
 });
 /* 隱藏主機商自動插入的浮動標籤（例如 Powered by Netlify），避免擋住下方按鈕 */
 (function(){

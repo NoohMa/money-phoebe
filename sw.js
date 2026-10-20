@@ -1,60 +1,54 @@
-/* Money V3.4 - Service Worker */
-const V = 'money-v3.5|' + self.registration.scope;
-const CORE = ['./index.html'];
+/* Money money-v3.6 - PWA 更新與離線快取 */
+const CACHE = 'money-v3.6|' + self.registration.scope;
 const OPTIONAL = ['./config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 const CDN = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|cdnjs\.cloudflare\.com\/ajax\/libs\/)/;
-
-self.addEventListener('install', event => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(V);
-    // 主頁是必要檔案；其他檔案缺少時不得導致整個 SW 安裝失敗。
-    await cache.addAll(CORE.map(path => new Request(path, {cache:'reload'})));
+self.addEventListener('install', e => {
+  e.waitUntil((async () => {
+    const c = await caches.open(CACHE);
+    await c.add(new Request('./index.html', {cache:'reload'}));
     await Promise.allSettled(OPTIONAL.map(async path => {
       const req = new Request(path, {cache:'reload'});
       const res = await fetch(req);
-      if (res.ok) await cache.put(req, res);
+      if (res.ok) await c.put(req,res);
     }));
     await self.skipWaiting();
   })());
 });
-
-self.addEventListener('activate', event => {
-  event.waitUntil((async () => {
+self.addEventListener('activate', e => {
+  e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key !== V && key.startsWith('money-') && key.endsWith('|' + self.registration.scope)).map(key => caches.delete(key)));
+    await Promise.all(keys.filter(k => k !== CACHE && k.endsWith('|' + self.registration.scope)).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
-
-self.addEventListener('fetch', event => {
-  const req = event.request;
+self.addEventListener('fetch', e => {
+  const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin === self.location.origin) {
-    // 網路優先：上線後立即取得新版；斷網才回退至上次成功快取。
-    event.respondWith((async () => {
-      const cache = await caches.open(V);
+  if (url.origin === location.origin) {
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
       try {
         const res = await fetch(req, {cache:'no-cache'});
-        if (res.ok) await cache.put(req, res.clone());
+        if (res.ok) await c.put(req, res.clone());
         return res;
-      } catch (_) {
-        const saved = await cache.match(req, {ignoreSearch:true});
-        if (saved) return saved;
+      } catch (err) {
+        const hit = await c.match(req, {ignoreSearch:true});
+        if (hit) return hit;
         if (req.mode === 'navigate') {
-          const home = await cache.match('./index.html');
+          const home = await c.match('./index.html');
           if (home) return home;
         }
         return Response.error();
       }
     })());
   } else if (CDN.test(url.href)) {
-    event.respondWith((async () => {
-      const cache = await caches.open(V);
-      const saved = await cache.match(req);
-      if (saved) return saved;
+    e.respondWith((async () => {
+      const c = await caches.open(CACHE);
+      const hit = await c.match(req);
+      if (hit) return hit;
       const res = await fetch(req);
-      if (res.ok || res.type === 'opaque') await cache.put(req, res.clone());
+      if (res.ok || res.type === 'opaque') await c.put(req,res.clone());
       return res;
     })());
   }
