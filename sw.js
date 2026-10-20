@@ -1,5 +1,5 @@
-/* Money V3.2 - Service Worker */
-const V = 'money-v3.2|' + self.registration.scope;
+/* Money V3.3 - Service Worker */
+const V = 'money-v3.3|' + self.registration.scope;
 const CORE = ['./index.html'];
 const OPTIONAL = ['./config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 const CDN = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|cdnjs\.cloudflare\.com\/ajax\/libs\/)/;
