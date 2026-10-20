@@ -1,5 +1,5 @@
-/* Money money-v3.9 - PWA 更新與離線快取 */
-const CACHE = 'money-v3.9|' + self.registration.scope;
+/* Money money-v3.12 - PWA 更新與離線快取 */
+const CACHE = 'money-v3.12|' + self.registration.scope;
 const OPTIONAL = ['./config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 const CDN = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|cdnjs\.cloudflare\.com\/ajax\/libs\/)/;
 self.addEventListener('install', e => {
