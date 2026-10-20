@@ -331,6 +331,20 @@ html,body{overflow-x:clip}
 .layer .lhd{flex-shrink:0}
 .layer .fscroll{overflow-x:hidden}
 
+
+/* 備註自適應：預設兩行，第三行起自動增高，最多八行可內捲 */
+textarea.note{
+  line-height:1.55;
+  min-height:0;
+  height:auto;
+  max-height:none;
+  overflow-y:hidden;
+  overflow-x:hidden;
+  resize:none;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  box-sizing:border-box;
+}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -876,7 +890,7 @@ function openLayer(key, fn, cls='full', mount){
   if (cls === 'full') el.addEventListener('click', e => { if (e.target !== el || innerWidth < 1000) return; if (key === 'add' && hasDraft() && !confirm('放棄這筆還沒存的紀錄？')) return; closeLayer(key); });
   requestAnimationFrame(() => el.classList.add('on'));
 }
-function drawLayer(L){ L.el.innerHTML = L.fn(); L.mount && L.mount(L.el); }
+function drawLayer(L){ L.el.innerHTML = L.fn(); L.mount && L.mount(L.el); L.el.querySelectorAll('textarea.note').forEach(fitNoteHeight); }
 function redraw(key){ const L = LAYERS.find(l => l.key === key); if (!L) return; const old = L.el.querySelector('.fscroll,.bdy'); const y = old ? old.scrollTop : 0; drawLayer(L); const next = L.el.querySelector('.fscroll,.bdy'); if (next) next.scrollTop = y; }
 function closeLayer(key, instant){
   const i = key ? LAYERS.findIndex(l => l.key === key) : LAYERS.length - 1;
@@ -1673,7 +1687,7 @@ function renderAdd(){
         ${sg.length ? `<div class="chips">${sg.map(n => `<button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();this.closest('.layer').classList.remove('typing');F.store=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}`; })() : ''}
       <div class="frow"><span class="lb">專案</span><span class="vl"><b class="${pj ? '' : 'tx2'}">${pj ? esc(pj.name) : '無專案'}</b></span>${ic('down',16)}<select class="ov" onchange="setProj(this.value)">${projOpts()}</select></div>
       ${repeatRow}
-      <textarea class="note" rows="2" placeholder="備註" oninput="F.note=this.value" onfocus="typingOn(this)" onblur="typingOff(this)">${esc(F.note)}</textarea>
+      <textarea class="note" rows="2" placeholder="備註" oninput="F.note=this.value;fitNoteHeight(this)" onfocus="typingOn(this)" onblur="typingOff(this)">${esc(F.note)}</textarea>
       ${notes.length ? `<div class="chips">${notes.map(n => `<button onmousedown="event.preventDefault()" onclick="document.activeElement&&document.activeElement.blur();this.closest('.layer').classList.remove('typing');F.note=${esc(JSON.stringify(n))};redraw('add')">${esc(n)}</button>`).join('')}</div>` : ''}
     </div>
     <div class="kpw"><button class="kpdn" onclick="kpSet(true)" title="收起計算機（不存檔）">▼</button><div class="kp">${['7','8','9','÷','AC','4','5','6','×','⌫','1','2','3','-','00','0','.','+'].map(k => `<button class="${OPS.test(k) || k === '%' ? 'op' : ''}" onclick="key('${k}')">${k === '⌫' ? ic('back',22) : k === '-' ? '−' : k}</button>`).join('')}<button class="ok" onclick="saveTxn()">OK</button></div></div>
@@ -1685,6 +1699,22 @@ const zoomF = () => parseFloat(getComputedStyle(document.body).zoom) || 1;   // 
 document.addEventListener('click', e => { const m = e.target && e.target.closest && e.target.closest('div.row .mid'); if (m) m.classList.toggle('wrap'); });
 /* v2.21：電腦（滑鼠＋實體鍵盤）打字時不藏計算機；手機打字時藏計算機，鍵盤上方留「OK 存檔」條 */
 const DESK = (() => { try { return matchMedia('(hover:hover) and (pointer:fine)').matches; } catch (e) { return false; } })();
+
+/* 統一個人／家庭版備註自適應：支援輸入、刪除、舊記錄與子層重畫 */
+function fitNoteHeight(el){
+  if (!el || !el.classList || !el.classList.contains('note')) return;
+  const style = getComputedStyle(el);
+  const line = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.55 || 24;
+  const pad = (parseFloat(style.paddingTop)||0) + (parseFloat(style.paddingBottom)||0);
+  const border = (parseFloat(style.borderTopWidth)||0) + (parseFloat(style.borderBottomWidth)||0);
+  const floor = Math.ceil(line * 2 + pad + border);
+  const ceil = Math.ceil(line * 8 + pad + border);
+  el.style.height = 'auto';
+  const needed = Math.max(floor,el.scrollHeight + border);
+  el.style.height = Math.min(needed,ceil) + 'px';
+  el.style.overflowY = needed > ceil ? 'auto' : 'hidden';
+}
+
 function typingOn(el){ if (!DESK) el.closest('.layer')?.classList.add('typing'); }
 function typingOff(el){ setTimeout(() => { el.closest('.layer')?.classList.remove('typing'); }, 150); }
 (() => { const vv = window.visualViewport; if (!vv) return; let big = false;
