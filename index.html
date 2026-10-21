@@ -395,7 +395,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.12';
+const VERSION = 'V3.14';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -1071,7 +1071,7 @@ function viewHome(){
       <div class="tap" onclick="goRp('trend','month',${y},${m})"><small>本月結餘 ›</small><b class="${ms.inc - ms.exp < 0 ? 'exp' : ''}">${twd(ms.inc - ms.exp)}</b></div></div>
       ${(() => { const v = availNow(), np = nextPayday(), dl = np ? Math.max(1, diffD(np, td)) : 0;
         return `<div class="avl tap" onclick="go('accounts')"><div class="l1"><span class="tx2">手上可動用 ›</span><b class="${v.avail < 0 ? 'exp' : ''}">${twd(v.avail)}</b></div>
-          ${np ? `<div class="sm tx2"><span style="text-decoration:underline dotted" onclick="event.stopPropagation();setPayOv()">到 ${md(np)}</span> 每天可花 <b style="color:var(--tx)">${twd(Math.max(0, v.avail) / dl)}</b></div>` : ''}</div>`; })()}
+          ${np ? `<div class="sm tx2" onclick="event.stopPropagation();openBP()"><span style="text-decoration:underline dotted" onclick="event.stopPropagation();setPayOv()">到 ${md(np)}</span> 每天可花 <b style="color:var(--tx)">${twd(Math.max(0, v.avail) / dl)}</b> ›</div>` : ''}</div>`; })()}
       ${bud && bud.total ? (() => { const T = bud.total;
         return `<div class="bref tap" onclick="goRp('budget','month',${y},${m})">預算參考：${T.remain >= 0 ? `還剩 ${twd(T.remain)}` : `超出 ${twd(-T.remain)}`}（已用 ${Math.round(T.pct * 100)}%）›</div>`; })() : ''}</div>
     ${goalHome()}<div class="per">${perCell('本週', wsum, `openRange('${ws}','${addD(ws, 6)}')`, wPrev.exp && wNow.exp ? cmpTxt(pct(wNow.exp, wPrev.exp), '比上週') : '')}${perCell(`${m+1}月`, ms, `goRp('trend','month',${y},${m})`, mPrev.exp && mNow.exp ? cmpTxt(pct(mNow.exp, mPrev.exp), '比上月') : '')}${perCell(`${y}年`, ysum, `goRp('trend','year',${y},${m})`)}</div>
@@ -1156,10 +1156,10 @@ function viewAcct(){
   const now = new Date(), isCurM = ay === now.getFullYear() && amn === now.getMonth();
   let info = '';
   if (ci) { const f = v => fmt(v, a.currency), ln = (label, v, cls, click, note) => `<div class="${click ? 'tap' : ''}" ${click ? `onclick="${click}"` : ''} style="display:flex;justify-content:space-between;align-items:baseline;padding:7px 2px;border-top:1px solid var(--line)"><span><span class="tx2">${label}${click ? ' ›' : ''}</span>${note ? `<br><small class="tx2">${note}</small>` : ''}</span><b class="${cls || ''}">${f(v)}</b></div>`;
-    info = `<div class="card">
+    info = `<div class="card"><button class="btn sec2" style="margin-bottom:12px" onclick="openBP('${a.id}')">預繳・到下次發薪前試算 ›</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px"><div class="tap" onclick="openDebt('${a.id}')"><small class="tx2">待繳總額 ›</small><div style="font-size:28px;font-weight:800" class="${ci.debt >= 1 ? 'exp' : 'inc'}">${f(ci.debt)}${ci.debt < 1 ? '<span style="font-size:15px;margin-left:8px">✓ 已全部繳清</span>' : ''}</div></div>${ci.over ? `<div style="text-align:right"><small class="tx2">溢繳</small><div class="inc b">${f(ci.over)}</div></div>` : ''}</div>
-    ${ln(`本期未繳（${md(ci.due)} 截止・${ci.left >= 0 ? '剩 ' + ci.left + ' 天' : ci.left >= -3 ? '已過截止日' : '已逾期'}）`, ci.remain, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`, `${md(ci.close)} 帳單 ${f(ci.owed)}${ci.manual ? '（依帳單）' : ''}・已繳 ${f(ci.paid)}${ci.off.r >= 1 ? `・回饋退款抵扣 ${f(ci.off.r)}` : ''}`)}
-    ${ln('下期待繳', ci.post, '', `openStmt('${a.id}','${ci.next}')`, `${md(ci.next)} 結帳・結帳後新增 ${f(Math.max(0, ci.newPost))}${ci.nextInst ? `＋分期 ${f(ci.nextInst)}` : ''}${ci.off.p >= 1 ? `−已抵扣 ${f(ci.off.p)}` : ''}${ci.miss >= 1 ? `＋上期未結清 ${f(ci.miss)}` : ''}`)}
+    ${ln(`本期未繳（${md(ci.due)} 截止・${ci.left >= 0 ? '剩 ' + ci.left + ' 天' : ci.left >= -3 ? '已過截止日' : '已逾期'}）`, ci.remain, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`, `${md(ci.close)} 帳單 ${f(ci.owed)}${ci.manual ? '（依帳單）' : ''}・已繳 ${f(ci.paid)}${ci.off.r >= 1 ? `・回饋退款抵扣 ${f(ci.off.r)}` : ''}${ciOver(ci) >= 1 ? `・${ciPayDates(a, ci)} 繳款多 ${f(ciOver(ci))}，已抵下期` : ''}`)}
+    ${ln('下期待繳', ci.post, '', `openStmt('${a.id}','${ci.next}')`, `${md(ci.next)} 結帳・結帳後新增 ${f(Math.max(0, ci.newPost))}${ci.nextInst ? `＋分期 ${f(ci.nextInst)}` : ''}${ci.off.p >= 1 ? `−已抵扣 ${f(ci.off.p)}${ciOver(ci) >= 1 ? `（含本期多繳 ${f(Math.min(ciOver(ci), ci.off.p))}）` : ''}` : ''}${ci.miss >= 1 ? `＋上期未結清 ${f(ci.miss)}` : ''}`)}
     ${(() => { const live = [...compute().list.filter(t => t.type === 'expense' && t.accountId === a.id && t.inst && t.inst.n > 1 && !t.inst.payoff).map(t => instStatus(t)),
         ...Object.values(S.data.plans || {}).filter(pl => pl.accountId === a.id && !pl.payoff).map(pl => planStatus(pl, ci))].filter(st => st.left > 0);
       const mx = live.reduce((m, st) => st.left > m.left ? st : m, {left:0, last:''}), sum = live.length ? `${live.length} 筆分期・最長剩 ${mx.left} 期（到 ${mx.last.slice(0, 7).replace('-', '/')}）・` : '';
@@ -1318,7 +1318,7 @@ function renderStmt(){
         <div class="sm tx2">${d.prevBank ? '上期已填銀行帳單，上期帶入差＝0，這是本期自己的差（消費、分期、折抵）' : '上期沒填銀行帳單，差額可能含上期帶入；上期也填就能分開看'}</div>` : ''}
       ${!future ? `<button class="sm" style="display:block;margin:8px 0 0 auto;color:var(--acc);font-weight:600" onclick="setStmt('${a.id}','${close}')">${ov !== null ? '修改銀行帳單金額' : '以銀行帳單為準…'}</button>` : ''}
       ${!future ? `<div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:6px;border-top:1px solid var(--line)"><span class="tx2">這期已繳／抵扣${pays.length ? `（${pays.map(t => md(t.date)).join('、')}）` : ''}</span><b class="inc">${f(paid)}</b></div>
-        <div style="display:flex;justify-content:space-between;padding-top:4px"><span class="tx2">${unp >= 1 ? (close === cc ? `未繳（${md(dueOf(a, close))} 截止）` : '未繳（併入下期）') : '狀態'}</span><b class="${unp >= 1 ? 'exp' : 'inc'}">${unp >= 1 ? f(unp) : '✓ 繳清'}</b></div>
+        <div style="display:flex;justify-content:space-between;padding-top:4px"><span class="tx2">${unp >= 1 ? (close === cc ? `未繳（${md(dueOf(a, close))} 截止）` : '未繳（併入下期）') : '狀態'}</span><b class="${unp >= 1 ? 'exp' : 'inc'}">${unp >= 1 ? f(unp) : '✓ 繳清'}</b></div>${paid - bill >= 1 ? `<div class="sm tx2" style="text-align:right">多繳 ${f(paid - bill)}，已抵下期</div>` : ''}
         ${unp >= 1 && close === cc ? `<button class="btn" style="margin-top:10px" onclick="payStmt('${a.id}',${Math.round(unp)})">記繳款 ${f(unp)}</button>` : ''}` : ''}</div>
       ${sec('inst', '本期分期', '')}${sec('buy', '本期消費', '')}${sec('refund', '退款・回饋', '−')}${sec('pay', '繳款', '−')}${sec('plan', '轉帳單分期', '−')}
       ${empty ? '<div class="empty">這期沒有紀錄</div>' : ''}
@@ -1389,14 +1389,14 @@ function renderDebt(aid){
   return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('debt')">${ic('left',24)}</button><h2>${esc(a.name)} 待繳明細</h2><span style="width:40px"></span></div>
     <div class="fscroll"><div class="card mt0"><small class="tx2">待繳總額</small><div style="font-size:28px;font-weight:800" class="exp">${f(ci.debt)}</div>
       <div class="sm tx2" style="margin-top:4px">本期未繳 ${f(ci.remain)} ＋ 下期待繳 ${f(ci.post)} ＋ 分期未入帳 ${f(ci.unbilled)}${Math.abs(ci.diff) >= 1 ? ` ＋ 差額 ${f(ci.diff)}` : ''}</div></div>
-    ${head(`本期未繳（${md(ci.close)} 帳單）`, ci.remain, `繳款截止 ${md(ci.due)}・帳單 ${f(ci.owed)}${ci.manual ? '（依銀行帳單）' : ''}・已繳 ${f(ci.paid)}`, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`)}
+    ${head(`本期未繳（${md(ci.close)} 帳單）`, ci.remain, `繳款截止 ${md(ci.due)}・帳單 ${f(ci.owed)}${ci.manual ? '（依銀行帳單）' : ''}・已繳 ${f(ci.paid)}${ciOver(ci) >= 1 ? `・多繳 ${f(ciOver(ci))} 已抵下期` : ''}`, ci.remain ? 'exp' : '', `openStmt('${a.id}','${ci.close}')`)}
     ${ci.remain >= 1 ? `<div style="margin:0 16px 8px"><button class="btn sec2" style="padding:10px" onclick="payStmt('${a.id}',${Math.round(ci.remain)})">記繳款 ${f(ci.remain)}</button></div>` : ''}
     <div class="list">${cd.prevOwed >= 1 ? `<button class="row" onclick="openStmt('${a.id}','${cd.prev}')"><span class="mid"><b>上期帳單</b><small>${md(cd.prev)} 結帳</small></span><span class="amt">${f(cd.prevOwed)}</span></button>` : ''}
       ${cd.it.pay.length ? `<button class="row" onclick="openStmt('${a.id}','${ci.close}')"><span class="mid"><b>本期繳款</b><small>${cd.it.pay.length} 筆</small></span><span class="amt inc">−${f(cd.sum('pay'))}</span></button>` : ''}
       ${curRows || '<div class="empty">這期沒有消費</div>'}
       ${ci.paid ? `<div class="row"><span class="mid"><b>結帳後已繳</b></span><span class="amt inc">−${f(ci.paid)}</span></div>` : ''}</div>
     ${Math.abs(ci.diff) >= 1 ? `<div class="hint" style="margin:8px 20px 0">帳單與 App 推算差額 ${f(ci.diff)}：上面的明細是 App 依你的紀錄算的 ${f(ci.auto)}，銀行帳單是 ${f(ci.owed)}。逐筆跟銀行帳單對，找出不同的那筆。</div>` : ''}
-    ${head(`下期待繳（${md(ci.next)} 結帳）`, ci.post, [ci.off.p >= 1 ? `已抵扣 ${f(ci.off.p)}` : '', ci.miss >= 1 ? `含上期未結清 ${f(ci.miss)}` : ''].filter(Boolean).join('・'), '', `openStmt('${a.id}','${ci.next}')`)}
+    ${head(`下期待繳（${md(ci.next)} 結帳）`, ci.post, [ci.off.p >= 1 ? `已抵扣 ${f(ci.off.p)}${ciOver(ci) >= 1 ? `（含本期多繳 ${f(Math.min(ciOver(ci), ci.off.p))}）` : ''}` : '', ci.miss >= 1 ? `含上期未結清 ${f(ci.miss)}` : ''].filter(Boolean).join('・'), '', `openStmt('${a.id}','${ci.next}')`)}
     <div class="list">${nextRows || '<div class="empty">還沒有新消費</div>'}</div>
     ${head('分期未入帳', ci.unbilled, `${md(closeAdd(a, ci.next, 1))} 以後的分期`, '', `openFuture('${a.id}')`)}
     <div class="list">${futRows || '<div class="empty">沒有</div>'}</div>
@@ -2890,6 +2890,161 @@ function ptEntry(){
   return `<button class="card" style="width:calc(100% - 32px);display:flex;align-items:center;gap:10px;text-align:left" onclick="openPT()">${ic('cart',20)}<span style="flex:1"><b>購買試算</b><br><small class="tx2">${n ? `待購 ${ws.length} 項${bad ? `・<span class="exp">${bad} 項會不夠</span>` : ''}` : '想買的東西先試算：用哪個帳戶付、買了剩多少'}</small></span>${ic('right',18)}</button>`;
 }
 function openPT(){ openLayer('pt', renderPT, 'full'); }
+/* V3.14：本期繳款超過帳單 → 多出的抵下期（銀行規則：繳款先抵已出帳帳單） */
+const ciOver = ci => ci ? Math.max(0, (ci.paid || 0) - (ci.owed || 0)) : 0;
+function ciPayDates(a, ci){ return paysFor(a, ci.close).map(t => md(t.date)).join('、'); }
+/* V3.14 到下次發薪前試算（單一頁）：可動用＋發薪前進帳－預繳－發薪前必繳＝剩下可用；只試算，不記帳 */
+let BP = null;
+const bpItems = () => S.settings.bpItems || [];
+function bpPaydays(from, to){   // from ≤ 發薪日 < to
+  const days = (S.settings.paydays || []).map(Number).filter(n => n >= 1 && n <= 31), ov = S.settings.payOv || {}, out = [];
+  if (!days.length) return out;
+  const f = pd(from);
+  for (let k = 0; k < 14; k++) { const y = f.getFullYear() + Math.floor((f.getMonth() + k) / 12), m = (f.getMonth() + k) % 12;
+    for (const dd of days) { const auto = payDate(y, m, dd), real = ov[auto] || auto; if (real >= from && real < to) out.push(real); } }
+  return [...new Set(out)].sort();
+}
+function bpDefaultTo(){
+  const td = today(), n1 = nextPayday(); if (!n1) return addM(td, 1);
+  if (diffD(n1, td) > 10) return n1;
+  const n2 = bpPaydays(addD(n1, 1), addM(n1, 2))[0]; return n2 || addM(n1, 1);
+}
+function openBP(cardId){
+  const cards = ptAccs().filter(a => a.type === 'credit' && cardInfo(a));
+  BP = {to:bpDefaultTo(), card:(cards.find(a => a.id === cardId) || cards[0] || {}).id || '', pre:'', off:new Set(), ov:{}, avail:'', nn:'', na:''};
+  openLayer('bp', renderBP, 'full');
+}
+function bpNum(v){ const n = parseFloat(String(v ?? '').replace(/,/g, '')); return isNaN(n) ? null : n; }
+function bpData(){
+  const td = today(), to = BP.to > td ? BP.to : addD(td, 1), A = S.data.accounts, inWin = d => d >= td && d < to;
+  const ins = [], outs = [], sal = bpNum(S.settings.bpSal) || 0;
+  const pays = bpPaydays(td, to);
+  for (const d of pays) ins.push({key:'sal_' + d, name:'薪水', date:d, amt:sal, sal:true});
+  if (!(S.settings.paydays || []).length) ins.push({key:'sal_x', name:'薪水（沒設發薪日）', date:'', amt:sal, sal:true});
+  const cashA = id => !id || (A[id] && spendable(A[id]));
+  for (const r of Object.values(S.data.recurring || {})) {
+    if (r.active === false) continue; const h = new Set(r.handled || []);
+    for (const d of ruleDates(r, addD(to, -1))) { if (d <= (r.base || '') || h.has(d) || d >= to) continue;
+      const nm = ruleName(r) + (d < td ? '（待確認）' : ''), key = 'r_' + r.id + '_' + d;
+      if (r.type === 'expense' && cashA(r.accountId)) outs.push({key, name:nm, date:d, amt:r.amount, src:'固定收支'});
+      else if (r.type === 'income' && cashA(r.accountId)) ins.push({key, name:nm, date:d, amt:r.amount, src:'固定收支'});
+      else if (r.type === 'transfer') { const fa = A[r.accountId] && spendable(A[r.accountId]), ta = A[r.toAccountId] && spendable(A[r.toAccountId]);
+        if (fa && !ta && A[r.toAccountId]?.type !== 'credit') outs.push({key, name:nm, date:d, amt:r.amount + (r.fee || 0), src:'固定收支'});
+        else if (!fa && ta) ins.push({key, name:nm, date:d, amt:r.toAmount || r.amount, src:'固定收支'}); } } }
+  for (const x of ptIn()) if (!x.off && cashA(x.aid)) ptExpand(x, 1, 'in').filter(o => !o.date || inWin(o.date)).forEach((o, i) => ins.push({key:'ci_' + x.id + '_' + i, name:x.name, date:o.date, amt:o.amt, src:'預計進帳'}));
+  for (const x of ptOut()) if (!x.off && cashA(x.aid)) ptExpand(x, -1, 'out').filter(o => !o.date || inWin(o.date)).forEach((o, i) => outs.push({key:'co_' + x.id + '_' + i, name:x.name, date:o.date, amt:-o.amt, src:'預估支出'}));
+  const E = ptEngine(), pre = Math.max(0, bpNum(BP.pre) || 0); let left = pre;
+  for (const a of ptAccs()) { if (a.type !== 'credit') continue;
+    (E.card[a.id] || []).filter(o => o.kind === 'bill' && inWin(o.date)).sort((x, y) => x.date < y.date ? -1 : 1).forEach(o => {
+      const key = 'cb_' + a.id + '_' + o.date + '_' + o.name; let use = 0;
+      if (a.id === BP.card && !BP.off.has(key)) { use = Math.min(left, o.amt); left -= use; }
+      outs.push({key, name:`${a.name} ${o.name}`, date:o.date, amt:o.amt, use, src:'卡費'}); }); }
+  for (const m of bpItems()) outs.push({key:'m_' + m.id, name:m.name, date:'', amt:+m.amt || 0, man:m, src:'自己填的'});
+  const val = it => { const v = bpNum(BP.ov[it.key]); return v !== null ? v : it.amt; };
+  const on = it => it.man ? !it.man.off : !BP.off.has(it.key);
+  const autoAvail = availNow().avail, av = bpNum(BP.avail) !== null ? bpNum(BP.avail) : autoAvail;
+  const inT = ins.filter(on).reduce((s, it) => s + val(it), 0), outT = outs.filter(on).reduce((s, it) => s + Math.max(0, val(it) - (it.use || 0)), 0);
+  const rest = av + inT - pre - outT, days = Math.max(1, diffD(to, td));
+  return {td, to, ins, outs, val, on, autoAvail, av, inT, outT, pre, rest, days, perDay:rest / days, unused:left};
+}
+function bpTog(key){ if (key.startsWith('m_')) { const id = key.slice(2); putSettings({bpItems:bpItems().map(m => m.id === id ? {...m, off:!m.off} : m)}); }
+  else { BP.off.has(key) ? BP.off.delete(key) : BP.off.add(key); } redraw('bp'); }
+function bpSet(key, v){ if (key.startsWith('m_')) { const id = key.slice(2), n = bpNum(v); putSettings({bpItems:bpItems().map(m => m.id === id ? {...m, amt:n !== null ? n : m.amt} : m)}); }
+  else if (String(v).trim() === '') delete BP.ov[key]; else BP.ov[key] = v; redraw('bp'); }
+function bpAdd(){ const n = (BP.nn || '').trim(), a = bpNum(BP.na); if (!n) return toast('請輸入名稱'); if (!(a > 0)) return toast('請輸入金額');
+  putSettings({bpItems:[...bpItems(), {id:'bp_' + uid(), name:n, amt:a, off:false}]}); BP.nn = ''; BP.na = ''; redraw('bp'); }
+function bpDel(id){ putSettings({bpItems:bpItems().filter(m => m.id !== id)}); redraw('bp'); }
+function renderBP(){
+  const r = bpData(), cards = ptAccs().filter(a => a.type === 'credit' && cardInfo(a)), inp = 'border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--bg);text-align:right;width:104px;font:inherit';
+  const row = (it, sign) => { const on = r.on(it), v = r.val(it);
+    return `<div class="row" style="${on ? '' : 'opacity:.45'}"><input type="checkbox" ${on ? 'checked' : ''} onchange="bpTog('${esc(it.key)}')" style="width:22px;height:22px;accent-color:var(--acc);flex:none">
+      <span class="mid"><b>${esc(it.name)}</b><small>${[it.date ? md(it.date) : '日期未定', it.src || '', it.use ? `預繳抵 ${twd(it.use)}，實付 ${twd(Math.max(0, v - it.use))}` : ''].filter(Boolean).join('・')}</small></span>
+      ${it.sal ? `<input inputmode="numeric" style="${inp}" placeholder="薪水金額" value="${esc(S.settings.bpSal ?? '')}" onchange="putSettings({bpSal:bpNum(this.value)});redraw('bp')">`
+        : `<input inputmode="numeric" style="${inp}" value="${esc(String(v))}" onchange="bpSet('${esc(it.key)}',this.value)">`}
+      ${it.man ? `<button class="mini" onclick="bpDel('${it.man.id}')">${ic('x',16)}</button>` : ''}</div>`; };
+  const big = (l, v, cls) => `<div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 0"><span class="tx2">${l}</span><b class="${cls || ''}">${v}</b></div>`;
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('bp')">${ic('left',24)}</button><h2>到下次發薪前試算</h2><span style="width:40px"></span></div><div class="fscroll">
+    <div class="card mt0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="tx2">今天 ${md(r.td)} → </span><input type="date" value="${r.to}" min="${addD(r.td, 1)}" onchange="if(this.value){BP.to=this.value;redraw('bp')}" style="${inp};width:auto"><span class="tx2">前（${r.days} 天）</span></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">
+      ${big('現在可動用', twd(r.av))}${big('＋ 發薪前進帳', twd(r.inT), 'inc')}${big('－ 預繳', twd(r.pre), r.pre ? 'exp' : '')}${big('－ 發薪前必繳', twd(r.outT), 'exp')}
+      <div style="display:flex;justify-content:space-between;align-items:baseline;border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span>剩下可用</span><b style="font-size:26px" class="${r.rest < 0 ? 'exp' : ''}">${twd(r.rest)}</b></div>
+      <div style="display:flex;justify-content:space-between"><span class="tx2">每天可花（÷ ${r.days} 天）</span><b class="${r.rest < 0 ? 'exp' : ''}">${twd(Math.max(0, r.perDay))}</b></div>
+      ${r.rest < 0 ? `<div class="alert warn" style="margin:10px 0 0">發薪前會不夠 ${twd(-r.rest)}，預繳少一點或延後</div>` : ''}</div></div>
+    <div class="sec"><h3>現在可動用</h3><span class="sm tx2">勾「列入可動用」的帳戶合計</span></div>
+    <div class="list"><div class="row"><span class="mid"><b>自動算 ${twd(r.autoAvail)}</b><small>要改就填實際數字，空白＝自動</small></span><input inputmode="numeric" style="${inp}" placeholder="${Math.round(r.autoAvail)}" value="${esc(BP.avail)}" onchange="BP.avail=this.value;redraw('bp')"></div></div>
+    <div class="sec"><h3>發薪前進帳</h3><span class="sm inc b">${twd(r.inT)}</span></div>
+    <div class="list">${r.ins.map(it => row(it, 1)).join('') || '<div class="empty" style="padding:14px">這段期間沒有進帳</div>'}</div>
+    ${(S.settings.paydays || []).length ? '' : `<div class="hint">設定 → 發薪日 填好，薪水日期會自動帶入。</div>`}
+    <div class="sec"><h3>預繳信用卡</h3><span class="sm exp b">${twd(r.pre)}</span></div>
+    <div class="list"><div class="row"><span class="mid"><select onchange="BP.card=this.value;redraw('bp')" style="border:1px solid var(--line);border-radius:10px;padding:7px;background:var(--bg);font:inherit;max-width:100%">${cards.map(a => `<option value="${a.id}" ${a.id === BP.card ? 'selected' : ''}>${esc(a.name)}</option>`).join('') || '<option>沒有信用卡</option>'}</select>
+      <small>發薪前到期的卡費會先抵${r.pre && r.unused < r.pre ? `（抵掉 ${twd(r.pre - r.unused)}）` : ''}</small></span><input inputmode="numeric" style="${inp}" placeholder="預繳金額" value="${esc(BP.pre)}" onchange="BP.pre=this.value;redraw('bp')"></div></div>
+    <div class="sec"><h3>發薪前必繳</h3><span class="sm exp b">${twd(r.outT)}</span></div>
+    <div class="list">${r.outs.map(it => row(it, -1)).join('') || '<div class="empty" style="padding:14px">還沒有必繳項目</div>'}
+      <div class="row"><span class="mid" style="display:flex;gap:8px"><input placeholder="新增必繳（例：房租）" value="${esc(BP.nn)}" oninput="BP.nn=this.value" style="flex:1;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 8px;background:var(--bg);font:inherit"></span>
+        <input inputmode="numeric" style="${inp}" placeholder="金額" value="${esc(BP.na)}" oninput="BP.na=this.value"><button class="mini" style="color:var(--acc)" onclick="bpAdd()">${ic('plus',20)}</button></div></div>
+    <div class="hint">自動帶入：固定收支、購買試算的預計進帳／預估支出、發薪前到期的卡費（只算從可動用帳戶付的）；可取消勾選或改金額。自己新增的必繳會記住，下次打開還在。只是試算，不會記帳。</div>
+    <div style="height:30px"></div></div></div>`;
+}
+/* V3.13 信用卡預繳情境：純記憶體試算，不寫入帳務或設定。 */
+let PP = {card:'', account:'', date:'', target:'current', amount:'', open:null};
+function openPrepay(cardId){
+  const cards = ptAccs().filter(a => a.type === 'credit' && cardInfo(a));
+  const a = cards.find(x => x.id === cardId) || cards[0];
+  PP = {card:a?.id || '', account:a?.payAcct && S.data.accounts[a.payAcct]?.type !== 'credit' ? a.payAcct : (ptAccs().find(x => x.type !== 'credit')?.id || ''), date:today(), target:'current', amount:'', open:null};
+  openLayer('prepay', renderPrepay, 'full');
+}
+function ppPick(k, v){ PP[k]=v; if(k==='card'){ const a=S.data.accounts[v]; if(a?.payAcct && S.data.accounts[a.payAcct]?.type !== 'credit') PP.account=a.payAcct; } redraw('prepay'); }
+function ppPlan(){
+  const a=S.data.accounts[PP.card], bank=S.data.accounts[PP.account], ci=a && cardInfo(a);
+  if(!a || !ci || !bank || bank.type==='credit') return null;
+  const parts=[{name:'本期',value:ci.remain},{name:'下期',value:ci.post},{name:'未入帳分期',value:ci.unbilled}];
+  const totals=[parts[0].value,parts[0].value+parts[1].value,parts.reduce((n,x)=>n+x.value,0)];
+  const max=totals[PP.target==='current'?0:PP.target==='next'?1:2];
+  const amount=PP.target==='custom' ? Math.max(0,Math.round(Number(PP.amount)||0)) : max;
+  const date=PP.date||today(), mi=ptMi(date), E=ptEngine(), before=ptAcctT(bank.id,E), adjustments=[];
+  // 優先抵扣最早到期的已知卡費。僅調整選定銀行帳戶內該卡的預估扣款。
+  let left=Math.min(amount,totals[2]);
+  const bills=(E.flow[bank.id]||[]).filter(o=>o.kind==='card' && o.card===a.id && o.wid===undefined && o.amt<0).sort((x,y)=>x.date.localeCompare(y.date));
+  const applied=[];
+  for(const bill of bills){
+    if(left<=0) break;
+    if(bill.date<date) continue; const use=Math.min(left,-bill.amt);left-=use;
+    applied.push({date:bill.date, name:bill.name, amount:use});
+    // 預繳晚於原扣款日期時，不能回頭抵銷已發生的扣款。
+    if(bill.date>=date && bill.mi>=0 && bill.mi<12) adjustments.push({date:bill.date,mi:bill.mi,amt:use,name:'預繳抵扣・'+bill.name,kind:'prepay-offset'});
+  }
+  if(amount>0 && mi>=0 && mi<12) adjustments.push({date,mi,amt:-amount,name:'信用卡預繳・'+a.name,kind:'prepay'});
+  const after=ptAcctT(bank.id,E,adjustments);
+  let rem=amount;const remaining=parts.map(x=>{const v=Math.max(0,x.value-Math.min(rem,x.value));rem=Math.max(0,rem-x.value);return {...x,after:v};});
+  const warning=date<today()?'日期已過':mi<0||mi>11?'日期超出 12 個月試算範圍':amount>totals[2]?'超過已知待繳總額，銀行可能列為溢繳':null;
+  return {a,bank,ci,parts,totals,amount,date,mi,before,after,remaining,applied,warning,unapplied:amount-applied.reduce((n,x)=>n+x.amount,0)};
+}
+function renderPrepay(){
+  const cards=ptAccs().filter(a=>a.type==='credit' && cardInfo(a)), banks=ptAccs().filter(a=>a.type!=='credit');
+  const opts=(arr,v)=>arr.map(a=>`<option value="${esc(a.id)}" ${a.id===v?'selected':''}>${esc(a.name)}</option>`).join('');
+  const r=ppPlan();
+  const row=(label,value)=>`<div style="display:flex;justify-content:space-between;padding:6px 0;gap:10px"><span class="tx2">${label}</span><b>${twd(value)}</b></div>`;
+  const months=r ? r.after.rows.map((x,i)=>{const b=r.before.rows[i];return `<tr onclick="PP.open=PP.open===${i}?null:${i};redraw('prepay')" style="cursor:pointer"><td>${ptMon(i)}</td><td>${twd(b.end)}</td><td class="b ${x.end<0?'exp':''}">${twd(x.end)}</td><td class="${x.end-b.end<0?'exp':'inc'}">${twd(x.end-b.end,true)}</td></tr>${PP.open===i?`<tr><td colspan="4" style="text-align:left;background:var(--bg)">${x.its.map(o=>`<div class="sm" style="display:flex;justify-content:space-between;gap:8px;padding:4px 0"><span>${esc(o.date||'日期未定')} ${esc(o.name)}</span><span>${twd(o.amt,true)}</span></div>`).join('')||'無預估收支'}</td></tr>`:''}`}).join('') : '';
+  return `<div class="lin"><div class="lhd"><button class="ib" onclick="closeLayer('prepay')">${ic('left',24)}</button><h2>信用卡預繳試算</h2><span style="width:40px"></span></div><div class="fscroll">
+    <div class="card mt0"><div class="fld"><label>信用卡</label><select onchange="ppPick('card',this.value)">${opts(cards,PP.card)}</select></div>
+    <div class="fld"><label>扣款銀行帳戶</label><select onchange="ppPick('account',this.value)">${opts(banks,PP.account)}</select></div>
+    <div class="fld"><label>預繳日期</label><input type="date" min="${today()}" value="${esc(PP.date)}" onchange="ppPick('date',this.value)"></div>
+    <div class="fld"><label>預繳目標</label><select onchange="ppPick('target',this.value)"><option value="current" ${PP.target==='current'?'selected':''}>繳清本期</option><option value="next" ${PP.target==='next'?'selected':''}>繳清本期＋下期</option><option value="all" ${PP.target==='all'?'selected':''}>繳清全部已知待繳</option><option value="custom" ${PP.target==='custom'?'selected':''}>自訂預繳金額</option></select></div>
+    ${PP.target==='custom'?`<div class="fld"><label>預繳金額</label><input type="number" min="0" inputmode="numeric" value="${esc(PP.amount)}" oninput="PP.amount=this.value;document.getElementById('ppResult').innerHTML=ppResultHtml()"></div>`:''}
+    </div><div id="ppResult">${ppResultHtml()}</div><div style="height:30px"></div></div></div>`;
+}
+function ppResultHtml(){
+  const r=ppPlan();if(!r)return `<div class="hint">請先建立信用卡、結帳與繳款日，以及可用的銀行帳戶。</div>`;
+  const diff=r.after.rows.map((x,i)=>x.end-r.before.rows[i].end), min=Math.min(...r.after.rows.map(x=>x.end));
+  const months=r.after.rows.map((x,i)=>{const b=r.before.rows[i];return `<tr onclick="PP.open=PP.open===${i}?null:${i};document.getElementById('ppResult').innerHTML=ppResultHtml()" style="cursor:pointer"><td>${ptMon(i)}</td><td>${twd(b.end)}</td><td class="b ${x.end<0?'exp':''}">${twd(x.end)}</td><td class="${diff[i]<0?'exp':'inc'}">${twd(diff[i],true)}</td></tr>${PP.open===i?`<tr><td colspan="4" style="text-align:left;background:var(--bg)">${x.its.map(o=>`<div class="sm" style="display:flex;justify-content:space-between;gap:8px;padding:4px 0"><span>${esc(o.date||'未定')} ${esc(o.name)}</span><span>${twd(o.amt)}</span></div>`).join('')||'無預估收支'}</td></tr>`:''}`}).join('');
+  const after=r.remaining.map(x=>`<div style="display:flex;justify-content:space-between;padding:6px 0"><span>${x.name}</span><b>${twd(x.value)} → ${twd(x.after)}</b></div>`).join('');
+  return `<div class="card mt0"><small class="tx2">${esc(r.a.name)}・預計預繳</small><div style="font-size:28px;font-weight:800;color:var(--exp)">${twd(r.amount)}</div>${after}
+    <div style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px"><small class="tx2">${esc(r.bank.name)} 目前餘額</small><div class="b">${twd(r.before.b0)}</div><div class="sm" style="margin-top:5px">預繳月份月底：${r.mi>=0&&r.mi<12?twd(r.before.rows[r.mi].end)+' → '+twd(r.after.rows[r.mi].end):'超出範圍'}</div><div class="sm ${min<0?'exp':''}" style="margin-top:5px">未來 12 個月最低預估月底餘額：${twd(min)}</div></div>
+    ${r.warning?`<div class="alert warn" style="margin:12px 0 0">${esc(r.warning)}</div>`:''}
+    ${r.unapplied>0?`<div class="sm exp" style="margin-top:8px">${twd(r.unapplied)} 無對應的已知預估卡費可抵扣；可能形成溢繳或由銀行另行分配。</div>`:''}</div>
+    <div class="card mt0" style="padding:12px"><b>未來 12 個月現金流</b><div class="sm tx2" style="margin:5px 0">已包含現有購買試算的預計進帳、預估支出及待購。點月份可看明細。</div><table class="tbl"><tr><th>月份</th><th>原預估</th><th>預繳後</th><th>差額</th></tr>${months}</table></div>
+    <div class="hint">本功能只做試算，不會新增交易或修改銀行帳戶、信用卡資料。預繳依本期、下期、未入帳分期順序估算；實際抵扣、未出帳分期與自動扣款仍以銀行規則為準。月底預估僅包含目前已知的未來收支。</div>`;
+}
 function ptTog(kind, id){ const key = kind === 'w' ? 'wish' : kind === 'in' ? 'cfIn' : 'cfOut'; putSettings({[key]:(S.settings[key] || []).map(x => x.id === id ? {...x, off:!x.off} : x)}); redraw('pt'); }
 function ptLater(kind, id){ const key = kind === 'w' ? 'wish' : kind === 'in' ? 'cfIn' : 'cfOut', n = new Date(), nd = new Date(n.getFullYear(), n.getMonth() + 1, 1), nx = `${nd.getFullYear()}-${p2(nd.getMonth() + 1)}`;
   putSettings({[key]:(S.settings[key] || []).map(x => x.id !== id ? x : kind === 'w' ? {...x, ym:nx} : {...x, date:addM(x.date, 1) < today() ? addM(today(), 1) : addM(x.date, 1)})}); redraw('pt'); }
@@ -2900,7 +3055,7 @@ function ptAdd(){ openLayer('pta', () => sheet('pta', '新增', `<div class="lis
   <button class="row" onclick="closeLayer('pta',true);openCfForm('out')">${ic('minus',20)}<span class="mid"><b>預估支出</b><small>例：保險、房租、紅包（可每月重複）</small></span></button></div>`), 'btm'); }
 function renderPT(){
   const ws = ptW(), ins = ptIn(), outs = ptOut(), A = S.data.accounts, hd = `<div class="lhd"><button class="ib" onclick="closeLayer('pt')">${ic('left',24)}</button><h2>購買試算</h2><button class="ib" onclick="ptAdd()">${ic('plus',24)}</button></div>`;
-  if (!ws.length && !ins.length && !outs.length) return `<div class="lin">${hd}<div class="fscroll"><div class="empty" style="padding:40px 24px;line-height:1.8">先填想買的東西，選用哪個帳戶付，<br>就會算出那個帳戶之後每個月剩多少、<br>或刷卡每月要多繳多少。<br><small class="tx2">只是試算，不會記帳。</small><br><button class="btn" style="margin-top:16px" onclick="openPTItem()">＋ 新增待購</button></div></div></div>`;
+  if (!ws.length && !ins.length && !outs.length) return `<div class="lin">${hd}<div class="fscroll"><div class="empty" style="padding:40px 24px;line-height:1.8">先填想買的東西，選用哪個帳戶付，<br>就會算出那個帳戶之後每個月剩多少、<br>或刷卡每月要多繳多少。<br><small class="tx2">只是試算，不會記帳。</small><br><button class="btn" style="margin-top:16px" onclick="openPTItem()">＋ 新增待購</button><button class="btn sec2" style="margin-top:10px" onclick="openBP()">預繳・到下次發薪前試算 ›</button></div></div></div>`;
   const ask = [...ws.filter(ptPast).map(w => `<div class="alert" style="width:calc(100% - 32px)">${ic('bell',18)}<span style="flex:1">${esc(w.name)}（${w.ym.replace('-', '/')}）買了嗎？</span><button class="sm b" onclick="ptDel('w','${w.id}')">買了・刪除</button><button class="sm b" style="margin-left:10px;color:var(--acc)" onclick="ptLater('w','${w.id}')">改下個月</button></div>`),
     ...[...ins.map(x => ['in', x]), ...outs.map(x => ['out', x])].filter(([, x]) => ptCfPast(x)).map(([k, x]) => `<div class="alert" style="width:calc(100% - 32px)">${ic('bell',18)}<span style="flex:1">${md(x.date)} ${esc(x.name)} ${k === 'in' ? '到了嗎？' : '付了嗎？'}</span><button class="sm b" onclick="ptDel('${k}','${x.id}')">${k === 'in' ? '到了・刪除' : '付了・刪除'}</button><button class="sm b" style="margin-left:10px;color:var(--acc)" onclick="ptLater('${k}','${x.id}')">延後一個月</button></div>`)].join('');
   const grpSeen = new Set(), wRow = w => { const r = w.off ? null : ptCalc(w), a = A[w.aid], p = wishPlan(w);
@@ -2913,7 +3068,7 @@ function renderPT(){
     <button class="mid" style="text-align:left" onclick="openCfForm('${k}','${x.id}')"><b>${esc(x.name)}</b><small>${x.rep ? `每月 ${x.date ? pd(x.date).getDate() + ' 號' : ''}${x.until ? `・到 ${x.until.replace(/-/g, '/')}` : ''}` : x.date ? md(x.date) : '日期未定'}・${A[x.aid] ? esc(A[x.aid].name) : '<span class="exp">沒選帳戶，不會算進去</span>'}</small></button>
     <span class="amt ${k === 'in' ? 'inc' : 'exp'}">${k === 'in' ? '+' : '−'}${twd(+x.amt || 0)}</span></div>`;
   return `<div class="lin">${hd}<div class="fscroll">${ask}
-    <div class="sec"><h3>待購</h3><button class="sm" style="color:var(--acc);font-weight:600" onclick="openPTItem()">＋ 新增</button></div>
+    <div style="margin:10px 16px"><button class="btn sec2" onclick="openBP()">預繳・到下次發薪前試算 ›</button></div><div class="sec"><h3>待購</h3><button class="sm" style="color:var(--acc);font-weight:600" onclick="openPTItem()">＋ 新增</button></div>
     <div class="list">${list || '<div class="empty" style="padding:14px">還沒有待購</div>'}</div>
     ${ins.length || outs.length ? `<div class="sec"><h3>預計進帳・預估支出</h3><button class="sm" style="color:var(--acc);font-weight:600" onclick="ptAdd()">＋ 新增</button></div><div class="list">${ins.map(x => cRow('in', x)).join('')}${outs.map(x => cRow('out', x)).join('')}</div>` : ''}
     <div class="hint">勾選的才算進試算；點待購看那個帳戶每個月的變化。只是試算，不會記帳。</div><div style="height:30px"></div></div></div>`;
