@@ -86,6 +86,9 @@ nav .fab{width:54px;height:54px;border-radius:18px;background:var(--acc);color:#
 .layer.full{background:var(--bg)}
 .layer.full .lin{max-width:520px;width:100%;margin:0 auto;height:100%;display:flex;flex-direction:column}
 .layer.btm{justify-content:flex-end}
+.tog>input[type=checkbox],.row>input[type=checkbox]{order:-1;flex:none}   /* V3.32：勾選框一律在文字前面 */
+.tog:has(>input[type=checkbox]){justify-content:flex-start;flex-wrap:nowrap;gap:12px}
+.tog.tog:has(>input[type=checkbox])>span:first-child{flex:1;min-width:0;white-space:normal}
 @media (max-width:999px){#layers .layer.full.wnav{bottom:calc(62px + env(safe-area-inset-bottom))} body:has(#layers .wnav :is(input,textarea,select):focus) nav{display:none} #layers .layer.full.wnav:has(:is(input,textarea,select):focus){bottom:0} body:has(#layers .wnav) nav .fab{margin-top:0;width:44px;height:44px;border-radius:14px}}   /* V3.28：子層留導覽列；打字時收起 */
 @media (min-width:1000px){#layers .layer.full.wnav{left:88px}}   /* 電腦：左側導覽列也能按 */
 .bd{position:absolute;inset:0;background:rgba(0,0,0,.35)}
@@ -397,7 +400,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.31';
+const VERSION = 'V3.32';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -4501,7 +4504,7 @@ function renderBudgetEdit(){
   const avg = id => { const n = new Date(); let s = 0; for (let i = 1; i <= 3; i++) { const d = new Date(n.getFullYear(), n.getMonth() - i, 1); s += spentOf(d.getFullYear(), d.getMonth())[id] || 0; } return s / 3; };
   const body = `<div class="fld"><label>每月總預算（台幣，留空＝不設）<span style="float:right">近 3 月平均 ${twd(avg('_t'))}${(() => { try { return '・月預估能花 ' + twd(bpPeek(0).rest); } catch (e) { return ''; } })()}</span></label><input inputmode="numeric" value="${esc(BE.total)}" oninput="BE.total=this.value"></div>
     <div class="tog"><span>沒花完累積到下個月<br><small class="tx2">超支也會從下個月扣</small></span><input type="checkbox" ${BE.carry ? 'checked' : ''} onchange="BE.carry=this.checked"></div>
-    <div class="tog"><span>一次性不算進預算<br><small class="tx2">分析頁類型是「一次性」的不算（代墊、不計本來就不算）</small></span><input type="checkbox" ${BE.exOneoff ? 'checked' : ''} onchange="BE.exOneoff=this.checked"></div>
+    <div class="tog"><span>一次性也不算進預算<br><small class="tx2">打勾＝一次性不算；不勾＝只有代墊、不計不算</small></span><input type="checkbox" ${BE.exOneoff ? 'checked' : ''} onchange="BE.exOneoff=this.checked"></div>
     <div class="fld" style="margin-top:10px"><label>分類預算（留空＝不設）</label>
     ${mains.map(c => `<div class="row" style="padding:6px 0;border:0"><span class="cic" style="background:${c.color};width:32px;height:32px;border-radius:10px">${ic(c.icon,16)}</span><span class="mid"><b>${esc(c.name)}</b><small>近 3 月平均 ${twd(avg(c.id))}</small></span>
       <input inputmode="numeric" style="width:110px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);text-align:right" value="${esc(BE.cats[c.id] || '')}" oninput="BE.cats['${c.id}']=this.value"></div>`).join('')}</div>
