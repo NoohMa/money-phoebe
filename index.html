@@ -86,6 +86,8 @@ nav .fab{width:54px;height:54px;border-radius:18px;background:var(--acc);color:#
 .layer.full{background:var(--bg)}
 .layer.full .lin{max-width:520px;width:100%;margin:0 auto;height:100%;display:flex;flex-direction:column}
 .layer.btm{justify-content:flex-end}
+@media (max-width:999px){#layers .layer.full.wnav{bottom:calc(62px + env(safe-area-inset-bottom))} body:has(#layers .wnav :is(input,textarea,select):focus) nav{display:none} #layers .layer.full.wnav:has(:is(input,textarea,select):focus){bottom:0}}   /* V3.28：子層留導覽列；打字時收起 */
+@media (min-width:1000px){#layers .layer.full.wnav{left:88px}}   /* 電腦：左側導覽列也能按 */
 .bd{position:absolute;inset:0;background:rgba(0,0,0,.35)}
 .sh{position:relative;background:var(--card);border-radius:22px 22px 0 0;max-height:86vh;display:flex;flex-direction:column;max-width:520px;width:100%;margin:0 auto;padding-bottom:env(safe-area-inset-bottom)}
 .sh .hd{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 10px;font-weight:700;font-size:16px}
@@ -395,7 +397,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.27';
+const VERSION = 'V3.28';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -896,7 +898,7 @@ let tt; function toast(m){ const e = $('#toast'); e.textContent = m; e.classList
 const LAYERS = [];
 function openLayer(key, fn, cls='full', mount){
   closeLayer(key, true);
-  const el = document.createElement('div'); el.className = 'layer ' + cls;
+  const el = document.createElement('div'); el.className = 'layer ' + cls + (cls === 'full' && key !== 'add' ? ' wnav' : '');   // V3.28：記帳頁以外的子層留導覽列
   $('#layers').appendChild(el);
   const L = {key, el, fn, mount}; LAYERS.push(L); drawLayer(L);
   if (cls === 'full') el.addEventListener('click', e => { if (e.target !== el || innerWidth < 1000) return; if (key === 'add' && hasDraft() && !confirm('放棄這筆還沒存的紀錄？')) return; closeLayer(key); });
@@ -950,7 +952,8 @@ function navPush(tab){
   if (c.tab !== tab || (tab === 'reports' && c.rp.seg !== S.ui.rp.seg) || (tab === 'home' && c.sel !== S.ui.sel) || (tab === 'acct' && c.acct !== S.ui.acct)) { NAVSTK.push({...c, y:scrollY, link:!NAVTAB}); if (NAVSTK.length > 30) NAVSTK.shift(); }
 }
 let NAVTAB = false;
-function navTab(tab){ if (tab === S.ui.tab) { scrollTo(0, 0); return; } NAVTAB = true; navPush(tab); NAVTAB = false; go(tab, true); }   // v2.41：底部選單切頁也記，返回回上一頁
+function navTab(tab){ if (LAYERS.length) { for (const L of [...LAYERS]) if (L.key !== 'add') closeLayer(L.key, true); if (tab === S.ui.tab) { render(); scrollTo(0, 0); return; } }   // V3.28：子層按導覽列＝關掉子層跳過去
+  if (tab === S.ui.tab) { scrollTo(0, 0); return; } NAVTAB = true; navPush(tab); NAVTAB = false; go(tab, true); }   // v2.41：底部選單切頁也記，返回回上一頁
 function go(tab, noPush){ if (!noPush) navPush(tab); S.ui.tab = tab; S.ui.sorting = false; if (location.hash) history.replaceState(history.state || {guard:1}, '', location.pathname + location.search); render(); scrollTo(0, 0); }
 
 /* ---------- home ---------- */
