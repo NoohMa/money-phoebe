@@ -397,7 +397,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.29';
+const VERSION = 'V3.31';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -1067,6 +1067,7 @@ function viewHome(){
     <div style="display:flex;gap:4px">${sel !== td ? `<button class="ib" onclick="selDay('${td}')" style="font-size:13px;width:auto;padding:0 10px;color:var(--acc)">今天</button>` : ''}
     <button class="ib" onclick="openSearch()">${ic('search',22)}</button><button class="ib" onclick="openMonthCal()">${ic('cal',22)}</button></div></div>
     <div class="hcols"><div class="hc1">${alerts()}${monthReportCard()}
+    ${FEAT.demo ? `<div class="alert" style="margin:8px 16px 0;display:flex;align-items:center;gap:8px"><span style="flex:1">展示版・資料全是虛構，可以隨便改</span><button class="mini" style="width:auto;padding:4px 10px;color:var(--acc)" onclick="demoReset()">重置</button></div>` : ''}
     <div class="week" id="week"><button class="arr" onclick="selDay('${addD(sel,-7)}')">${ic('left',20)}</button><div class="days">${days}</div><button class="arr" onclick="selDay('${addD(sel,7)}')">${ic('right',20)}</button></div>
     <div class="card"><div class="sum3">
       <div class="tap" onclick="goRp('cat','month',${y},${m},'income')"><small>本月收入 ›</small><b class="inc">${twd(ms.inc)}</b></div>
@@ -2625,7 +2626,7 @@ function renderWish(){
     <div class="fscroll">${ws.length ? `<div class="card mt0">
       <div style="display:flex;justify-content:space-between;align-items:baseline;padding:4px 2px"><span class="tx2">勾選合計${fee ? `<br><small>含利息 ${twd(fee)}</small>` : ''}</span><b style="font-size:20px">${twd(tot)}</b></div>
       <div class="tap" onclick="closeLayer('wish',true);go('accounts')" style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px;border-top:1px solid var(--line)"><span class="tx2">一次付後可動用 ›<br><small>現在 ${twd(av)}${onceT ? `・一次付 ${twd(onceT)}` : ''}</small></span><b style="font-size:20px" class="${av - onceT < 0 ? 'exp' : ''}">${twd(av - onceT)}</b></div>
-      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px 2px;border-top:1px solid var(--line)"><span class="tx2">每月多出分期<br><small>${add[mxI] ? `${ms[fi][0]}/${ms[fi][1] + 1} 起${add[mxI] !== add[fi] ? `・最多 ${ms[mxI][1] + 1} 月` : ''}` : '沒有分期'}</small></span><b style="font-size:20px" class="${add[mxI] ? 'exp' : ''}">${twd(add[mxI])}</b></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;padding:8px 2px 2px;border-top:1px solid var(--line)"><span class="tx2">每月多出分期<br><small>${add[mxI] ? `${ms[fi][0]}/${ms[fi][1] + 1} 起${add[mxI] !== add[fi] ? `・最多 ${ms[mxI][1] + 1} 月` : ''}` : '沒有分期'}</small></span><b style="font-size:20px" class="${add[mxI] ? 'exp' : ''}">${twd(add[mxI])}</b></div>${wishGoalImpact(on, plans, add[mxI])}</div>
       ${false ? `<div class="card"><div class="sec" style="margin:0 0 4px;padding:0"><h3>分期壓力試算</h3><span class="sm tx2">未來 12 個月・點月份看數字</span></div>
         ${multiLine(ms.map(([, m]) => (m + 1) + '月'), [{k:'a', vals:after, color:'var(--exp)'}, {k:'b', vals:sum, color:'var(--tx2)', dash:1}], WSEL, 'wishPick')}
         <div class="lg2"><button><i style="background:var(--exp)"></i>加上待購</button><button><i style="background:var(--tx2)"></i>現有分期</button></div>${sel}</div>` : ''}
@@ -3529,7 +3530,7 @@ const mEnd = m => { const [y, mm] = m.split('-').map(Number); return ds(new Date
 const mKeyD = d => d.slice(0, 7);
 /* items：[{date, amt, html}]（新到舊）；o.name＝已選分類名、o.pre＝選了月份時最上面多一行、o.n＝不選月份時的總筆數 */
 function monthDetail(items, o = {}){
-  const sel = UX.msel, g = {}; for (const it of items) { const k = mKeyD(it.date), x = g[k] || (g[k] = {m:k, n:0, v:0}); x.n++; x.v += it.amt || 0; }
+  const sel = UX.msel, g = {}; if (sel) items = items.filter(it => mKeyD(it.date) === sel);   // V3.30：選了月份只留那個月（分析分類明細傳的是全部月份） for (const it of items) { const k = mKeyD(it.date), x = g[k] || (g[k] = {m:k, n:0, v:0}); x.n++; x.v += it.amt || 0; }
   const ms = Object.values(g).sort((a, b) => a.m < b.m ? 1 : -1), multi = ms.length > 1;
   const head = `<div class="sec"><h3>明細${o.name ? '・' + esc(o.name) : ''}${sel ? '・' + sel.replace('-', '/') : ''}</h3>${sel ? `<button class="sm" style="color:var(--acc)" onclick="msPick('${sel}',this)">全部月份 ✕</button>` : `<span class="sm tx2">${items.length} 筆${multi ? '・依月份' : ''}</span>`}</div>`;
   if (!items.length) return head + '<div class="list"><div class="empty">沒有紀錄</div></div>';
@@ -3538,6 +3539,104 @@ function monthDetail(items, o = {}){
 }
 /* 清單依月份加小標 */
 function mGroup(list, dateOf, rowFn){ let last = '', out = ''; for (const x of list) { const m = (dateOf(x) || '').slice(0, 7); if (m !== last) { out += `<div class="sm tx2" style="padding:8px 16px 2px;font-weight:700">${m.replace('-', '/')}</div>`; last = m; } out += rowFn(x); } return out; }
+/* ===== V3.31 待購 × 存錢目標（只讀不改） ===== */
+function wishGoalImpact(on, plans, instMax){
+  const gs = (S.settings.goals || []).filter(g => { const gi = goalInfo(g); return !gi.done && !gi.over; });
+  if (!gs.length) return `<div class="tap" onclick="openGoal()" style="padding:8px 2px 2px;border-top:1px solid var(--line)"><span class="tx2">設定存錢目標可看買了還存不存得到 ›</span></div>`;
+  const n = new Date(); let sv = 0; for (let k = 1; k <= 6; k++) { const d1 = new Date(n.getFullYear(), n.getMonth() - k, 1), s = summary(ds(d1), ds(new Date(d1.getFullYear(), d1.getMonth(), dim(d1.getFullYear(), d1.getMonth())))); sv += s.inc - s.exp; }
+  const avgSv = sv / 6, room = avgSv - instMax;
+  return gs.map(g => { const gi = goalInfo(g), ym = g.date.slice(0, 7), aff = w => g.mode !== 'acct' || w.aid === g.aid;
+    const cost = on.filter(aff).reduce((s, w) => { const p = plans[w.id]; return s + (p.n > 1 ? p.pcs.filter(([i]) => i >= 0 && i < gi.left).reduce((x, [, v]) => x + v, 0) : (!w.ym || w.ym <= ym ? +w.amt || 0 : 0)); }, 0);
+    const d = room - gi.per, left = gi.need + cost; let late = '';
+    if (left > 0 && room > 0) { const k = Math.ceil(left / room), e = new Date(n.getFullYear(), n.getMonth() + k - 1, 1), em = `${e.getFullYear()}-${p2(e.getMonth() + 1)}`; if (em > ym) late = `要延到 ${e.getFullYear()}/${e.getMonth() + 1}`; }
+    else if (left > 0) late = '照現在的結餘存不到';
+    return `<div class="tap" onclick="openGoal('${g.id}')" style="padding:8px 2px 2px;border-top:1px solid var(--line)"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><span class="tx2" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">存錢：${esc(g.name)} ›</span><b style="white-space:nowrap" class="${d < 0 ? 'exp' : 'inc'}">${d < 0 ? '每月差 ' + twd(-d) : '夠，多 ' + twd(d)}</b></div>
+      <small class="tx2">每月要存 ${twd(gi.per)}・近 6 月平均結餘 ${twd(avgSv)}${instMax ? `－每月分期 ${twd(instMax)}` : ''}${cost ? `・買完還差 ${twd(gi.need)} → ${twd(left)}` : g.mode === 'acct' ? '・不從存錢帳戶付，不影響進度' : ''}${late ? `・<span class="exp">${late}</span>` : ''}</small></div>`; }).join('');
+}
+/* ===== V3.31 展示版：config.js 設 MONEY_OPTIONS={demo:true} 時，本機第一次開自動產生虛構資料 ===== */
+function demoGen(){
+  const d = defaultData(), A = d.accounts, T = d.txns; let seed = 20211101; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const pick = a => a[Math.floor(rnd() * a.length)], R = (a, b) => Math.round(a + rnd() * (b - a));
+  const start = new Date(2021, 10, 1), td = today();
+  A.a_cash = {...A.a_cash, init:2000};
+  Object.assign(A, {
+    a_bank:{id:'a_bank', name:'示範銀行（薪轉）', type:'bank', currency:'TWD', init:180000, order:1, color:'#2E86AB', archived:false, inNW:true},
+    a_dig:{id:'a_dig', name:'數位帳戶', type:'bank', currency:'TWD', init:20000, order:2, color:'#4FB286', archived:false, inNW:true},
+    a_save:{id:'a_save', name:'存錢帳戶', type:'bank', currency:'TWD', init:50000, order:3, color:'#8E6CC0', archived:false, inNW:true, spend:false},
+    a_ez:{id:'a_ez', name:'悠遊卡', type:'epay', currency:'TWD', init:300, order:4, color:'#E8A33C', archived:false, inNW:true},
+    a_cA:{id:'a_cA', name:'信用卡 A', type:'credit', currency:'TWD', init:0, order:5, color:'#D1495B', archived:false, inNW:true, closeDay:12, dueDay:26, limit:200000, postDays:2, payAcct:'a_bank'},
+    a_cB:{id:'a_cB', name:'信用卡 B', type:'credit', currency:'TWD', init:0, order:6, color:'#3E9BD6', archived:false, inNW:true, closeDay:5, dueDay:20, limit:120000, postDays:2, payAcct:'a_bank'}
+  });
+  let n = 0; const add = (date, type, amount, catId, accountId, extra = {}) => { const id = 'd' + (++n); T[id] = {id, type, amount, catId, accountId, date, createdAt:n, updatedAt:n, note:'', ...extra}; return T[id]; };
+  const tr = (date, from, to, amount, note) => add(date, 'transfer', amount, FEE_CAT, from, {toAccountId:to, toAmount:amount, fee:0, note:note || ''});
+  let cash = 2000, ez = 300; const card = () => rnd() < .6 ? 'a_cA' : 'a_cB';
+  d.projects.p_jp23 = {id:'p_jp23', name:'2023 京都旅行', order:0, hidden:false};
+  d.projects.p_jp25 = {id:'p_jp25', name:'2025 北海道旅行', order:1, hidden:false};
+  for (let dt = new Date(start); ds(dt) <= td; dt.setDate(dt.getDate() + 1)) {
+    const x = ds(dt), y = dt.getFullYear(), m = dt.getMonth(), day = dt.getDate(), wd = dt.getDay(), yrs = y - 2021, last = dim(y, m);
+    const sal = Math.round(54000 * Math.pow(1.03, Math.max(0, yrs - (m < 2 ? 1 : 0))) / 100) * 100;
+    if (day === 25 || (day === last && last < 25)) add(x, 'income', sal, 'c_i0_0', 'a_bank', {note:'薪資'});
+    if (m === 1 && day === 10) add(x, 'income', sal * 1.5, 'c_i0_3', 'a_bank', {note:'年終獎金'});
+    if (m === 5 && day === 15 && rnd() > .3) add(x, 'income', R(2000, 9000), 'c_i0_4', 'a_bank', {note:'退稅'});
+    if (day === 21 && m % 3 === 2) add(x, 'income', R(30, 120), 'c_i1_0', 'a_save', {note:'活存利息'});
+    if (day === 12 && rnd() > .75) add(x, 'income', R(2000, 6000), 'c_i0_2', 'a_dig', {note:'講師費'});
+    if (day === 1) add(x, 'expense', yrs >= 3 ? 16000 : 15000, 'c_e1_0', 'a_bank', {note:'房租'});
+    if (day === 26) tr(x, 'a_bank', 'a_save', 8000, '每月存錢');
+    if (day === 8) add(x, 'expense', 599, 'c_e2_0', 'a_cA', {store:'電信公司'});
+    if (day === 18) add(x, 'expense', 799, 'c_e2_1', 'a_cB', {store:'網路公司'});
+    if (day === 10 && m % 2 === 0) { add(x, 'expense', R(250, 900), 'c_e1_2', 'a_dig', {note:'電費'}); add(x, 'expense', R(150, 350), 'c_e1_1', 'a_dig', {note:'水費'}); }
+    if (day === 15) add(x, 'expense', 2600, 'c_e10_2', 'a_bank', {store:'壽險公司', note:'保險'});
+    if (day === 20) add(x, 'expense', 5000, 'c_e7_1', 'a_bank', {note:'孝親'});
+    if (m === 4 && day === 31) add(x, 'expense', R(3000, 8000), 'c_e10_3', 'a_bank', {note:'綜所稅'});
+    if (cash < 600) { tr(x, 'a_bank', 'a_cash', 3000, 'ATM 提款'); cash += 3000; }
+    if (ez < 150) { tr(x, 'a_cash', 'a_ez', 500, '悠遊卡加值'); cash -= 500; ez += 500; }
+    const sp = (amt, cat, acc, ex) => { add(x, 'expense', amt, cat, acc, ex); if (acc === 'a_cash') cash -= amt; if (acc === 'a_ez') ez -= amt; };
+    if (rnd() > .15) sp(R(45, 90), 'c_e0_0', 'a_cash', {store:pick(['早餐店', '7-ELEVEN', '全家'])});
+    if (wd >= 1 && wd <= 5) sp(R(90, 200), 'c_e0_1', rnd() > .5 ? card() : 'a_cash', {store:pick(['便當店', '麵店', '自助餐', '速食店'])});
+    else if (rnd() > .5) sp(R(150, 500), 'c_e0_1', card(), {store:pick(['餐廳', '火鍋店', '拉麵店'])});
+    if (rnd() > .35) sp(R(90, 280), 'c_e0_2', rnd() > .4 ? card() : 'a_cash', {store:pick(['小吃店', '便當店', '餐廳', '外送平台'])});
+    if (rnd() > .5) sp(R(35, 75), 'c_e0_4', 'a_ez', {store:pick(['手搖飲', '咖啡店', '超商'])});
+    if (rnd() > .85) sp(R(20, 80), 'c_e0_5', 'a_ez', {store:'超商'});
+    if (wd >= 1 && wd <= 5 && rnd() > .35) sp(R(20, 60), 'c_e3_2', 'a_ez', {store:'捷運／公車'});
+    if (wd === 6 && rnd() > .3) sp(R(900, 1400), 'c_e3_0', card(), {store:'加油站'});
+    if (rnd() > .93) sp(R(40, 120), 'c_e3_1', 'a_cash', {store:'停車場'});
+    if (wd === 0 && rnd() > .5) sp(R(400, 1500), 'c_e0_6', card(), {store:pick(['量販店', '超市'])});
+    if (rnd() > .9) sp(R(80, 600), 'c_e1_5', card(), {store:pick(['藥妝店', '量販店', '網購'])});
+    if (rnd() > .94) sp(R(300, 2500), 'c_e6_' + R(0, 3), card(), {store:pick(['服飾店', '網購平台', '百貨公司', '藥妝店'])});
+    if (rnd() > .95) sp(R(250, 1200), 'c_e5_' + pick([0, 2, 3]), card(), {store:pick(['影城', '健身房', '遊戲平台'])});
+    if (rnd() > .97) sp(R(200, 900), 'c_e8_' + R(0, 2), 'a_cash', {store:pick(['診所', '藥局'])});
+    if (rnd() > .985) sp(R(500, 3000), 'c_e9_' + R(0, 1), 'a_cash', {note:pick(['朋友生日', '婚禮紅包', '伴手禮'])});
+    if (day === 3 && m === 0) sp(R(4000, 6000), 'c_e9_1', 'a_cash', {note:'過年紅包'});
+    if (m === 9 && day === 5) add(x, 'expense', [32900, 36900, 39900, 42900, 45900][yrs % 5], 'c_e6_1', 'a_cA', {store:'3C 賣場', note:'手機', inst:{n:12, fee:0}});
+    if (y === 2024 && m === 2 && day === 9) add(x, 'expense', 48000, 'c_e6_1', 'a_cB', {store:'3C 賣場', note:'筆電', inst:{n:24, fee:3216, apr:6}});
+    if ((y === 2023 && m === 3 && day >= 10 && day <= 14) || (y === 2025 && m === 6 && day >= 3 && day <= 8)) {
+      const pj = y === 2023 ? 'p_jp23' : 'p_jp25';
+      if (day === (y === 2023 ? 10 : 3)) add(x, 'expense', y === 2023 ? 18500 : 23800, 'c_e5_1', 'a_cA', {store:'航空公司', note:'機票', projectId:pj});
+      add(x, 'expense', R(2500, 4500), 'c_e5_1', 'a_cA', {store:'飯店', note:'住宿', projectId:pj});
+      add(x, 'expense', R(800, 2500), 'c_e0_2', 'a_cA', {store:'旅途餐廳', projectId:pj});
+    }
+    if (rnd() > .992) add(x, 'expense', R(3000, 12000), 'c_e1_6', 'a_cB', {store:'家電行', note:pick(['吸塵器', '電風扇', '除濕機', '微波爐'])});
+  }
+  return d;
+}
+function demoPayCards(){ let n = 900000; const td = today();
+  for (const aid of ['a_cA', 'a_cB']) { const a = S.data.accounts[aid]; let c = closeOf(a, '2021-11-01');
+    while (true) { const due = dueOf(a, c); if (due > td) break; bump();
+      const tot = Math.round(stmtData(a, c).total); if (tot > 0) { const id = 'p' + (++n); S.data.txns[id] = {id, type:'transfer', amount:tot, catId:FEE_CAT, accountId:a.payAcct, toAccountId:aid, toAmount:tot, fee:0, date:due, createdAt:n, updatedAt:n, note:'繳卡費'}; }
+      c = closeAdd(a, c, 1); } }
+  bump(); }
+function demoSettings(){ const y = new Date().getFullYear();
+  return {nickname:'展示帳本', theme:'rose', paydays:[25], srGoal:25, feeByPeriod:true, autoBk:false, bpSal:57300, bpSalAid:'a_bank',
+    budget:{total:45000, carry:false, cats:{c_e0:14000, c_e6:4000, c_e5:3000}, since:'2024-01'},
+    fixed:['c_e1', 'c_e2', 'c_e10'],
+    goals:[{id:'g_1', name:`${y} 年底存 10 萬`, target:100000, start:`${y}-01-01`, date:`${y}-12-31`, mode:'acct', aid:'a_save'}],
+    wish:[{id:'w_1', name:'新手機', amt:38900, ym:`${y}-12`, n:12, aid:'a_cA', apr:0, grp:'', off:false},
+          {id:'w_2', name:'機票（過年出國）', amt:16800, ym:`${y + 1}-01`, n:1, aid:'a_bank', apr:0, grp:'', off:false}],
+    cfIn:[{id:'ci_1', name:'年終獎金', amt:70000, date:`${y + 1}-02-10`, aid:'a_bank', rep:false, until:'', off:false}],
+    cfOut:[{id:'co_1', name:'汽車保險', amt:12000, date:`${y}-12-15`, aid:'a_bank', rep:false, until:'', off:false}],
+    recurring0:null}; }
+function demoBuild(){ S.data = demoGen(); S.settings = {...S.settings, ...demoSettings()}; bump(); demoPayCards(); saveLocal(); }
+function demoReset(){ if (!confirm('把展示資料重置回原始狀態？（你在這裡改過的都會清掉）')) return; try { localStorage.removeItem(LOCAL_KEY); } catch (e) {} location.reload(); }
 /* V3.13 信用卡預繳情境：純記憶體試算，不寫入帳務或設定。 */
 let PP = {card:'', account:'', date:'', target:'current', amount:'', open:null};
 function openPrepay(cardId){
@@ -4790,6 +4889,7 @@ function boot(){
     S.mode = 'local';
     const l = readLocal();
     if (l && l.data) { S.data = {accounts:{}, txns:{}, categories:{}, projects:{}, recurring:{}, templates:{}, plans:{}, ...l.data}; S.settings = {...S.settings, ...(l.settings || {})}; }
+    else if (FEAT.demo) { demoBuild(); }   // V3.31 展示版：第一次開自動產生虛構資料
     else { S.data = defaultData(); saveLocal(); }
     S.ready = true; bump(); applyTheme(); render(); afterReady();
   }
