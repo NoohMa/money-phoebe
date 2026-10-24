@@ -400,7 +400,7 @@ const FIREBASE_CONFIG = {
   appId: "..."
 };
 */
-const VERSION = 'V3.34';
+const VERSION = 'V3.35';
 
 /* ---------- utils ---------- */
 const $ = s => document.querySelector(s);
@@ -571,7 +571,7 @@ function del(col, id){
 }
 /* v2.22 指定配色：拉的時候只預覽，不重畫（重畫會把色盤關掉） */
 let colorT = null;
-function colorPrev(k, v){ S.settings = {...S.settings, theme:'custom', custom:{...(S.settings.custom || {}), [k]:v}}; applyTheme(); }
+function colorPrev(k, v){ S.settings = {...S.settings, pal:'custom', custom:{...(S.settings.custom || {}), [k]:v}}; applyTheme(); }
 function colorSave(k, v){ colorPrev(k, v); clearTimeout(colorT); colorT = setTimeout(() => { const st = S.settings; if (S.mode === 'cloud') { cloudWrite(L => L.collection('meta').doc('settings').set(clean(st))); bump(); } else saveLocal(); }, 400); }
 function colorDone(){ setTimeout(() => { if (!document.activeElement || document.activeElement.type !== 'color') render(); }, 500); }
 function setNickname(){ const v = prompt('顯示名稱', S.settings.nickname || ''); if (v === null) return; putSettings({nickname:v.trim().slice(0, 20)}); }
@@ -853,6 +853,8 @@ function cardInfoRaw(a){
 
 /* ---------- theme ---------- */
 const THEMES = {
+  sakura:{name:'櫻花粉', pri:'#F58EB3', acc:'#57C9C7'},
+  aqua:{name:'湖水綠粉', pri:'#3FB8B5', acc:'#F58EB3'},
   rose:{name:'玫瑰青', pri:'#C0707C', acc:'#2A8378'},
   lake:{name:'湖光', pri:'#D88A97', acc:'#1E9AA6'},
   berry:{name:'莓果', pri:'#B4547C', acc:'#3B7EA6'},
@@ -874,18 +876,24 @@ function effMode(){
 setInterval(() => { if (P.mode === 'time' && document.documentElement.dataset.mode !== effMode()) applyTheme(); }, 60000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTheme(); });
 function applyTheme(){
-  const th = {pri:'#F58EB3', acc:'#57C9C7'}; // V3 visual palette
+  const pal = S.settings.pal || 'sakura', th = pal === 'custom' ? {pri:'#C0707C', acc:'#2A8378', ...(S.settings.custom || {})} : (THEMES[pal] || THEMES.sakura);   // V3.35：配色可換，預設櫻花粉
   const dark = effMode() === 'dark', r = document.documentElement;
   r.dataset.mode = dark ? 'dark' : 'light';
   r.style.setProperty('--pri', th.pri); r.style.setProperty('--acc', th.acc);
   r.style.setProperty('--pri-s', dark ? mix(th.pri, '#211E1F', .72) : mix(th.pri, '#FFFFFF', .84));
   r.style.setProperty('--acc-s', dark ? mix(th.acc, '#211E1F', .72) : mix(th.acc, '#FFFFFF', .84));
-  document.querySelector('meta[name=theme-color]').content = dark ? '#181418' : '#FFF8FB';
-  makeIcon(th.acc);
+  const bgv = ['--bg', '--line', '--sh'];
+  if (pal === 'sakura') bgv.forEach(k => r.style.removeProperty(k));   // 櫻花粉＝原本的背景（樣式表）
+  else { const [R0, G0, B0] = hex2rgb(th.pri);
+    r.style.setProperty('--bg', dark ? mix(th.pri, '#191619', .9) : mix(th.pri, '#FFFFFF', .95));
+    r.style.setProperty('--line', dark ? mix(th.pri, '#2A2529', .78) : mix(th.pri, '#FFFFFF', .87));
+    r.style.setProperty('--sh', dark ? '0 3px 14px rgba(0,0,0,.15)' : `0 3px 14px rgba(${R0},${G0},${B0},.10)`); }
+  document.querySelector('meta[name=theme-color]').content = getComputedStyle(r).getPropertyValue('--bg').trim() || (dark ? '#181418' : '#FFF8FB');
+  makeIcon(th.pri);
 }
 let iconFor = '';
 function makeIcon(color){
-  color = '#F58EB3';   // V3：APP 圖示採櫻花粉主色
+  // V3.35：APP 圖示跟著主色（櫻花粉＝原本的顏色）
   if (iconFor === color) return; iconFor = color;
   const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
   x.fillStyle = color; x.fillRect(0, 0, 180, 180);
@@ -4649,7 +4657,7 @@ function backupAlert(){
 
 /* ---------- settings ---------- */
 function viewSettings(){
-  const th = S.settings.theme, cu = S.settings.custom || {};
+  const th = S.settings.pal || 'sakura', cu = S.settings.custom || {};   // V3.35
   const used = [...new Set(accList(true).map(a => a.currency).filter(c => c !== 'TWD'))];
   const rateRows = (used.length ? used : ['JPY']).map(c => `<div class="row"><span class="mid"><b>${c} ${CUR[c]?.name || ''}</b><small>即時 ${(RATES.r[c] || FALLBACK_RATE[c] || 0).toFixed(4)}${S.settings.rateOverride?.[c] ? ' · 使用自訂' : ''}</small></span>
       <input inputmode="decimal" style="width:100px;border:1px solid var(--line);border-radius:10px;padding:8px;background:var(--bg);text-align:right" placeholder="自訂" value="${esc(S.settings.rateOverride?.[c] || '')}" onchange="setOverride('${c}',this.value)"></div>`).join('');
@@ -4659,7 +4667,7 @@ function viewSettings(){
       ? `<div class="row"><button class="mid" style="text-align:left" onclick="setNickname()"><b>${esc(S.settings.nickname || '我的帳本')} <span class="tx2" style="font-weight:400">${ic('edit',14)}</span></b><small>雲端同步中 · 換手機登入即可取回資料</small></button><button style="color:var(--exp)" onclick="logout()">登出</button></div>`
       : `<div class="row"><span class="mid"><b>本機模式</b><small>資料只存在這支手機的瀏覽器，設定 Firebase 後可跨裝置同步</small></span></div>`}</div>
     <div class="grp"><span>外觀</span></div>
-    <div class="card mt0" style="margin-top:0"><div class="thm">${Object.entries(THEMES).map(([k, v]) => `<button class="${th === k ? 'on' : ''}" onclick="putSettings({theme:'${k}'})"><div class="dots"><i style="background:${v.pri}"></i><i style="background:${v.acc}"></i></div>${v.name}</button>`).join('')}
+    <div class="card mt0" style="margin-top:0"><div class="thm">${Object.entries(THEMES).map(([k, v]) => `<button class="${th === k ? 'on' : ''}" onclick="putSettings({pal:'${k}'})"><div class="dots"><i style="background:${v.pri}"></i><i style="background:${v.acc}"></i></div>${v.name}</button>`).join('')}
       </div>
       <div class="tog" style="margin-top:10px"><span>自訂配色</span><span style="display:flex;gap:8px;align-items:center">
         <input type="color" value="${cu.pri || '#C0707C'}" oninput="colorPrev('pri',this.value)" onchange="colorSave('pri',this.value)" onblur="colorDone()" style="width:40px;height:34px;border:0;background:none">
