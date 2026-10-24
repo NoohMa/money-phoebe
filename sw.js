@@ -1,4 +1,4 @@
-const V = 'money-v3.33|' + self.registration.scope;
+const V = 'money-v3.34|' + self.registration.scope;
 const CORE = ['./', './index.html', './config.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 const CDN = /^https:\/\/(www\.gstatic\.com\/firebasejs\/|cdnjs\.cloudflare\.com\/ajax\/libs\/)/;
 
